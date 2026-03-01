@@ -50,6 +50,33 @@ Stop waiting for one agent to finish before starting the next. AgentForge lets y
 
 ---
 
+## Installation
+
+### Quick install (macOS / Linux)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/MarianZoll-Bain/agent-forge/main/install.sh | bash
+```
+
+### Manual download
+
+| Platform | Architecture | Download |
+|----------|-------------|----------|
+| macOS | Apple Silicon (arm64) | [.dmg](https://github.com/MarianZoll-Bain/agent-forge/releases/latest) |
+| macOS | Intel (x64) | [.dmg](https://github.com/MarianZoll-Bain/agent-forge/releases/latest) |
+| Windows | x64 | [.exe installer](https://github.com/MarianZoll-Bain/agent-forge/releases/latest) |
+| Linux | x64 | [.AppImage](https://github.com/MarianZoll-Bain/agent-forge/releases/latest) / [.deb](https://github.com/MarianZoll-Bain/agent-forge/releases/latest) |
+
+### Windows
+
+Download the `.exe` installer from the [latest release](https://github.com/MarianZoll-Bain/agent-forge/releases/latest) and run it. Windows SmartScreen may show a warning since the app is not code-signed yet — click "More info" → "Run anyway".
+
+### Auto-updates
+
+Once installed, AgentForge checks for updates automatically every 4 hours. When a new version is available, a badge appears in the header — click to download and restart.
+
+---
+
 ## Prerequisites
 
 - **macOS** (Electron builds target macOS; other platforms are untested)
@@ -89,6 +116,11 @@ On first launch, the onboarding wizard walks you through:
 | `npm run build` | Production build (output in `out/`) |
 | `npm test` | Run unit tests (Vitest) |
 | `npm run test:watch` | Run tests in watch mode |
+| `npm run pack` | Package app without installer (for testing) |
+| `npm run dist` | Build distributable for current platform |
+| `npm run dist:mac` | Build macOS .dmg + .zip (x64 + arm64) |
+| `npm run dist:win` | Build Windows NSIS installer (x64) |
+| `npm run dist:linux` | Build Linux AppImage + .deb (x64) |
 
 ## Offline Mode (Claude + Ollama)
 

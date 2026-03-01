@@ -6,6 +6,7 @@
 import { app, BrowserWindow } from 'electron'
 import { join } from 'path'
 import { registerIpcHandlers, setMainWindow } from './ipcHandlers'
+import { initAutoUpdater, stopAutoUpdater } from './services/autoUpdater'
 import { logger } from './logger'
 
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged
@@ -59,13 +60,18 @@ if (!gotTheLock) {
 
   app.whenReady().then(() => {
     registerIpcHandlers()
-    createWindow()
+    const win = createWindow()
+    initAutoUpdater(win)
     app.on('activate', () => {
-      if (BrowserWindow.getAllWindows().length === 0) createWindow()
+      if (BrowserWindow.getAllWindows().length === 0) {
+        const newWin = createWindow()
+        initAutoUpdater(newWin)
+      }
     })
   })
 
   app.on('window-all-closed', () => {
+    stopAutoUpdater()
     app.quit()
   })
 }

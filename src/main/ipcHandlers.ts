@@ -18,6 +18,7 @@ import { openAgent } from './services/agentOpener'
 import * as promptManager from './services/promptManager'
 import { verifyTool } from './services/toolVerifier'
 import { getPRStatus } from './services/prStatusService'
+import { getAppVersion, getUpdateStatus, checkForUpdates, downloadUpdate, installUpdate } from './services/autoUpdater'
 import type {
   RepoSelectResponse,
   RepoSelectResult,
@@ -595,5 +596,32 @@ export function registerIpcHandlers(): void {
     const parsed = z.string().url().safeParse(url)
     if (!parsed.success) return
     return shell.openExternal(parsed.data)
+  })
+
+  // ---- App version + auto-update ----
+
+  ipcMain.handle('app:version', (event) => {
+    if (!isSenderAllowed(event)) return { version: '0.0.0' }
+    return { version: getAppVersion() }
+  })
+
+  ipcMain.handle('updater:status', (event) => {
+    if (!isSenderAllowed(event)) return getUpdateStatus()
+    return getUpdateStatus()
+  })
+
+  ipcMain.handle('updater:check', (event) => {
+    if (!isSenderAllowed(event)) return
+    checkForUpdates()
+  })
+
+  ipcMain.handle('updater:download', (event) => {
+    if (!isSenderAllowed(event)) return
+    downloadUpdate()
+  })
+
+  ipcMain.handle('updater:install', (event) => {
+    if (!isSenderAllowed(event)) return
+    installUpdate()
   })
 }

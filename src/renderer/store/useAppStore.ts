@@ -4,7 +4,7 @@
  */
 
 import { create } from 'zustand'
-import type { AppState, PromptEntry } from '@shared/types'
+import type { AppState, PromptEntry, UpdateStatus } from '@shared/types'
 import type { AgentGitStatusResult, AgentPRStatusResult } from '@shared/ipc-channels'
 
 /** Toast auto-dismiss delay in ms. */
@@ -26,6 +26,8 @@ export interface DraftAgent {
 interface AppStoreState {
   state: AppState | null
   loadError: string | null
+  appVersion: string | null
+  updateStatus: UpdateStatus | null
   draftAgents: DraftAgent[]
   /** Git status per agentId (renderer-only, from polling). */
   agentGitStatuses: Record<string, AgentGitStatusResult>
@@ -44,6 +46,8 @@ interface AppStoreState {
 
   setState: (state: AppState) => void
   setLoadError: (error: string | null) => void
+  setAppVersion: (version: string) => void
+  setUpdateStatus: (status: UpdateStatus) => void
   setShowOnboarding: (show: boolean) => void
   refreshState: () => Promise<void>
   /** Show a toast notification; auto-dismissed after 4 s. */
@@ -104,6 +108,8 @@ function applyThemeToDOM(theme: 'light' | 'dark', darkMode: boolean | undefined)
 export const useAppStore = create<AppStoreState>((set, get) => ({
   state: null,
   loadError: null,
+  appVersion: null,
+  updateStatus: null,
   draftAgents: [],
   agentGitStatuses: {},
   agentPRStatuses: {},
@@ -123,6 +129,8 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
     set({ resolvedTheme: resolved })
   },
   setLoadError: (loadError) => set({ loadError }),
+  setAppVersion: (appVersion) => set({ appVersion }),
+  setUpdateStatus: (updateStatus) => set({ updateStatus }),
   setShowOnboarding: (showOnboarding) => set({ showOnboarding }),
 
   addToast: (message, type) => {

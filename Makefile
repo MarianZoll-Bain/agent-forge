@@ -3,7 +3,7 @@
 #        make dev                    (start app)
 #        make test                   (run tests)
 
-.PHONY: install dev run test build check clean
+.PHONY: install dev run test build check pack dist dist-mac dist-win dist-linux clean
 
 # Install dependencies
 install:
@@ -36,6 +36,26 @@ build:
 # Test the system: run tests then build (fails if either fails)
 check: test build
 
+# Package app without creating installer (for testing)
+pack:
+	npm run pack
+
+# Build distributable for current platform
+dist:
+	npm run dist
+
+# Build distributable for macOS (dmg + zip, x64 + arm64)
+dist-mac:
+	npm run dist:mac
+
+# Build distributable for Windows (NSIS installer, x64)
+dist-win:
+	npm run dist:win
+
+# Build distributable for Linux (AppImage + deb, x64)
+dist-linux:
+	npm run dist:linux
+
 # Remove build output (optional)
 clean:
-	rm -rf out
+	rm -rf out release dist

@@ -5,6 +5,7 @@
  */
 
 import { contextBridge, ipcRenderer } from 'electron'
+import type { UpdateStatus } from '../shared/types'
 import type {
   AgentValidateBranchPayload,
   AgentCreatePayload,
@@ -50,6 +51,22 @@ const api = {
     ipcRenderer.invoke('agent:prStatus', payload),
   openExternal: (url: string) =>
     ipcRenderer.invoke('shell:openExternal', url),
+  // Auto-update
+  getAppVersion: () =>
+    ipcRenderer.invoke('app:version'),
+  getUpdateStatus: () =>
+    ipcRenderer.invoke('updater:status'),
+  checkForUpdates: () =>
+    ipcRenderer.invoke('updater:check'),
+  downloadUpdate: () =>
+    ipcRenderer.invoke('updater:download'),
+  installUpdate: () =>
+    ipcRenderer.invoke('updater:install'),
+  onUpdateStatus: (callback: (status: UpdateStatus) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, status: UpdateStatus) => callback(status)
+    ipcRenderer.on('updater:status', handler)
+    return () => { ipcRenderer.removeListener('updater:status', handler) }
+  },
 }
 
 contextBridge.exposeInMainWorld('agentForge', api)

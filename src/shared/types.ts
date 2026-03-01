@@ -48,6 +48,25 @@ export const CURRENT_STATE_VERSION = 3
 
 export const DEFAULT_SETTINGS: Settings = {}
 
+// ---- Auto-update status ----
+
+export interface UpdateStatus {
+  /** Whether a new version is available for download */
+  available: boolean
+  /** The latest available version string (e.g. "1.2.0") */
+  latestVersion: string | null
+  /** Release notes (markdown) */
+  releaseNotes: string | null
+  /** URL to the release page on GitHub */
+  releaseUrl: string | null
+  /** Whether the update has been downloaded and is ready to install */
+  downloaded: boolean
+  /** Whether a check is currently in progress */
+  checking: boolean
+  /** Error message from last check/download attempt */
+  error: string | null
+}
+
 // ---- Prompts management ----
 
 export type PromptTool = 'cursor' | 'claude'

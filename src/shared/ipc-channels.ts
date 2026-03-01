@@ -305,6 +305,23 @@ export type AgentPRStatusResponse = AgentPRStatusResult | AgentPRStatusError
 /** Open a URL in the user's default browser */
 export const SHELL_OPEN_EXTERNAL = 'shell:openExternal' as const
 
+// ---- App version + auto-update channels ----
+
+/** Get the running app version */
+export const APP_VERSION = 'app:version' as const
+/** Get current update status (invoke) + push events (on) */
+export const UPDATER_STATUS = 'updater:status' as const
+/** Manually trigger an update check */
+export const UPDATER_CHECK = 'updater:check' as const
+/** Download an available update */
+export const UPDATER_DOWNLOAD = 'updater:download' as const
+/** Quit and install a downloaded update */
+export const UPDATER_INSTALL = 'updater:install' as const
+
+export interface AppVersionResponse {
+  version: string
+}
+
 // ---- Preload API (allowlisted only) ----
 
 export type PreloadAPI = {
@@ -324,6 +341,13 @@ export type PreloadAPI = {
   resetApp: () => Promise<AppResetResponse>
   getAgentPRStatus: (payload: AgentPRStatusPayload) => Promise<AgentPRStatusResponse>
   openExternal: (url: string) => Promise<void>
+  // Auto-update
+  getAppVersion: () => Promise<AppVersionResponse>
+  getUpdateStatus: () => Promise<import('./types').UpdateStatus>
+  checkForUpdates: () => Promise<void>
+  downloadUpdate: () => Promise<void>
+  installUpdate: () => Promise<void>
+  onUpdateStatus: (callback: (status: import('./types').UpdateStatus) => void) => () => void
 }
 
 declare global {

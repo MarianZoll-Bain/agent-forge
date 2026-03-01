@@ -12,6 +12,8 @@ export function Header() {
   const setShowOnboarding = useAppStore((s) => s.setShowOnboarding)
   const toggleDarkMode = useAppStore((s) => s.toggleDarkMode)
   const resolvedTheme = useAppStore((s) => s.resolvedTheme)
+  const appVersion = useAppStore((s) => s.appVersion)
+  const updateStatus = useAppStore((s) => s.updateStatus)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [promptsOpen, setPromptsOpen] = useState(false)
 
@@ -21,10 +23,16 @@ export function Header() {
         <div className="flex items-center gap-3 min-w-0">
           <div className="shrink-0">
             <span className="font-extrabold text-lg block leading-tight bg-gradient-to-r from-indigo-600 via-violet-600 to-purple-600 dark:from-indigo-400 dark:via-violet-400 dark:to-purple-400 bg-clip-text text-transparent tracking-tight">AgentForge</span>
-            <span className="text-[10px] text-slate-400 dark:text-slate-600 leading-none tracking-wide uppercase font-medium">Worktree Orchestrator</span>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] text-slate-400 dark:text-slate-600 leading-none tracking-wide uppercase font-medium">Worktree Orchestrator</span>
+              {appVersion && (
+                <span className="text-[10px] font-mono text-slate-400 dark:text-slate-600 leading-none">v{appVersion}</span>
+              )}
+            </div>
           </div>
         </div>
-        <div className="flex items-center gap-0.5 shrink-0">
+        <div className="flex items-center gap-1.5 shrink-0">
+          {updateStatus?.available && <UpdateBadge status={updateStatus} />}
           <HeaderButton
             onClick={() => setPromptsOpen(true)}
             label="Prompts"
@@ -67,6 +75,55 @@ export function Header() {
       )}
       {promptsOpen && <PromptsPanel onClose={() => setPromptsOpen(false)} />}
     </>
+  )
+}
+
+function UpdateBadge({ status }: { status: import('@shared/types').UpdateStatus }) {
+  const api = window.agentForge
+
+  function handleClick() {
+    if (status.downloaded) {
+      api?.installUpdate()
+    } else {
+      api?.downloadUpdate()
+    }
+  }
+
+  function handleOpenRelease(e: React.MouseEvent) {
+    e.stopPropagation()
+    if (status.releaseUrl) {
+      api?.openExternal(status.releaseUrl)
+    }
+  }
+
+  return (
+    <div className="flex items-center gap-1">
+      <button
+        type="button"
+        onClick={handleClick}
+        className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-700 hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:hover:bg-amber-900/50 transition-colors"
+      >
+        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+        </svg>
+        {status.downloaded
+          ? 'Restart to update'
+          : `v${status.latestVersion} available`}
+      </button>
+      {status.releaseUrl && (
+        <button
+          type="button"
+          onClick={handleOpenRelease}
+          className="p-1 rounded text-amber-600 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-300 transition-colors"
+          title="View release notes"
+          aria-label="View release notes"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+          </svg>
+        </button>
+      )}
+    </div>
   )
 }
 

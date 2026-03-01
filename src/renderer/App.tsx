@@ -11,7 +11,7 @@ import { ToastContainer } from './components/Toast'
 import { ErrorBoundary } from './components/ErrorBoundary'
 
 export default function App() {
-  const { setState, setLoadError, hasRepo, showOnboarding, setShowOnboarding, applyTheme } = useAppStore()
+  const { setState, setLoadError, setAppVersion, setUpdateStatus, addToast, hasRepo, showOnboarding, setShowOnboarding, applyTheme } = useAppStore()
   const state = useAppStore((s) => s.state)
   const [initialized, setInitialized] = useState(false)
 
@@ -35,7 +35,24 @@ export default function App() {
         setLoadError(e.message ?? 'Failed to load state')
         setInitialized(true)
       })
-  }, [setState, setLoadError, applyTheme])
+
+    // Fetch app version
+    api.getAppVersion().then(({ version }) => setAppVersion(version)).catch(() => {})
+
+    // Fetch initial update status and subscribe to changes
+    api.getUpdateStatus().then((status) => setUpdateStatus(status)).catch(() => {})
+    const unsubscribe = api.onUpdateStatus((status) => {
+      setUpdateStatus(status)
+      if (status.available && !status.downloaded) {
+        addToast(`Update v${status.latestVersion} available`, 'info')
+      }
+      if (status.downloaded) {
+        addToast('Update downloaded — restart to apply', 'success')
+      }
+    })
+
+    return unsubscribe
+  }, [setState, setLoadError, setAppVersion, setUpdateStatus, addToast, applyTheme])
 
   async function handleOnboardingComplete(settings: {
     enableCursor: boolean
