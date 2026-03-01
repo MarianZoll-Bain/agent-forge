@@ -13,7 +13,7 @@ const fixturesDir = path.resolve(__dirname, '../../__fixtures__')
 
 function makeTestRepo(dir: string): void {
   fs.mkdirSync(dir, { recursive: true })
-  execSync('git init', { cwd: dir })
+  execSync('git init -b main', { cwd: dir })
   execSync('git config user.email "test@test.com"', { cwd: dir })
   execSync('git config user.name "Test"', { cwd: dir })
   fs.writeFileSync(path.join(dir, 'README.md'), '# test')
