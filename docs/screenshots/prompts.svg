@@ -1,0 +1,107 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 600" fill="none">
+  <defs>
+    <linearGradient id="brand-p" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#818cf8"/>
+      <stop offset="50%" stop-color="#a78bfa"/>
+      <stop offset="100%" stop-color="#c084fc"/>
+    </linearGradient>
+    <filter id="shadow-p" x="-4%" y="-4%" width="108%" height="116%">
+      <feDropShadow dx="0" dy="2" stdDeviation="8" flood-opacity="0.3"/>
+    </filter>
+    <filter id="shadow-sm-p" x="-2%" y="-2%" width="104%" height="112%">
+      <feDropShadow dx="0" dy="1" stdDeviation="4" flood-opacity="0.2"/>
+    </filter>
+    <clipPath id="round-p"><rect width="960" height="600" rx="12"/></clipPath>
+  </defs>
+
+  <g clip-path="url(#round-p)">
+    <!-- Background -->
+    <rect width="960" height="600" fill="#09090b"/>
+    <circle cx="880" cy="60" r="260" fill="#6366f1" opacity="0.05"/>
+
+    <!-- Header bar -->
+    <rect width="960" height="52" fill="#09090b" opacity="0.9"/>
+    <line x1="0" y1="52" x2="960" y2="52" stroke="#ffffff" stroke-opacity="0.06"/>
+    <text x="20" y="30" font-family="system-ui,-apple-system,sans-serif" font-size="17" font-weight="800" fill="url(#brand-p)">AgentForge</text>
+    <text x="20" y="43" font-family="system-ui,-apple-system,sans-serif" font-size="8" font-weight="600" fill="#52525b" letter-spacing="1.2">WORKTREE ORCHESTRATOR</text>
+
+    <!-- Dimmed board behind -->
+    <rect width="960" height="548" y="52" fill="#09090b" opacity="0.5"/>
+
+    <!-- Prompts panel overlay — centered modal -->
+    <rect x="180" y="72" width="600" height="480" rx="16" fill="#18181b" filter="url(#shadow-p)"/>
+    <rect x="180" y="72" width="600" height="480" rx="16" fill="none" stroke="#ffffff" stroke-opacity="0.08"/>
+
+    <!-- Panel header -->
+    <text x="212" y="108" font-family="system-ui,-apple-system,sans-serif" font-size="16" font-weight="700" fill="#fafafa">Prompt Library</text>
+    <!-- Close button -->
+    <text x="748" y="108" font-family="system-ui,-apple-system,sans-serif" font-size="16" fill="#71717a" text-anchor="end">&#x2715;</text>
+    <!-- Divider -->
+    <line x1="196" y1="122" x2="764" y2="122" stroke="#ffffff" stroke-opacity="0.06"/>
+
+    <!-- Scope tabs -->
+    <rect x="212" y="136" width="52" height="24" rx="6" fill="#6366f1" opacity="0.15"/>
+    <text x="224" y="152" font-family="system-ui,-apple-system,sans-serif" font-size="10" font-weight="600" fill="#818cf8">Global</text>
+    <text x="282" y="152" font-family="system-ui,-apple-system,sans-serif" font-size="10" font-weight="600" fill="#71717a">Project</text>
+
+    <!-- Add prompt button -->
+    <rect x="668" y="136" width="86" height="24" rx="6" fill="#6366f1"/>
+    <text x="684" y="152" font-family="system-ui,-apple-system,sans-serif" font-size="10" font-weight="600" fill="#ffffff">+ New Prompt</text>
+
+    <!-- Prompt entry 1 -->
+    <rect x="212" y="176" width="536" height="72" rx="12" fill="#ffffff" opacity="0.03"/>
+    <rect x="212" y="176" width="536" height="72" rx="12" fill="none" stroke="#ffffff" stroke-opacity="0.06"/>
+    <!-- Claude badge -->
+    <rect x="228" y="190" width="52" height="18" rx="9" fill="#f97316" opacity="0.12"/>
+    <text x="238" y="203" font-family="system-ui,-apple-system,sans-serif" font-size="8" font-weight="700" fill="#fdba74">CLAUDE</text>
+    <!-- Scope badge -->
+    <rect x="288" y="190" width="48" height="18" rx="9" fill="#6366f1" opacity="0.12"/>
+    <text x="298" y="203" font-family="system-ui,-apple-system,sans-serif" font-size="8" font-weight="700" fill="#818cf8">GLOBAL</text>
+    <text x="228" y="224" font-family="system-ui,-apple-system,sans-serif" font-size="12" font-weight="600" fill="#e4e4e7">code-review.md</text>
+    <text x="228" y="238" font-family="system-ui,-apple-system,sans-serif" font-size="10" fill="#52525b">Review code for security issues, performance, and best practices...</text>
+    <!-- Actions -->
+    <text x="708" y="203" font-family="system-ui,-apple-system,sans-serif" font-size="10" font-weight="500" fill="#818cf8">Edit</text>
+    <text x="722" y="224" font-family="system-ui,-apple-system,sans-serif" font-size="10" font-weight="500" fill="#71717a">Move</text>
+    <text x="716" y="240" font-family="system-ui,-apple-system,sans-serif" font-size="10" font-weight="500" fill="#ef4444">Delete</text>
+
+    <!-- Prompt entry 2 -->
+    <rect x="212" y="260" width="536" height="72" rx="12" fill="#ffffff" opacity="0.03"/>
+    <rect x="212" y="260" width="536" height="72" rx="12" fill="none" stroke="#ffffff" stroke-opacity="0.06"/>
+    <!-- Cursor badge -->
+    <rect x="228" y="274" width="54" height="18" rx="9" fill="#8b5cf6" opacity="0.12"/>
+    <text x="238" y="287" font-family="system-ui,-apple-system,sans-serif" font-size="8" font-weight="700" fill="#c4b5fd">CURSOR</text>
+    <rect x="290" y="274" width="48" height="18" rx="9" fill="#6366f1" opacity="0.12"/>
+    <text x="300" y="287" font-family="system-ui,-apple-system,sans-serif" font-size="8" font-weight="700" fill="#818cf8">GLOBAL</text>
+    <text x="228" y="308" font-family="system-ui,-apple-system,sans-serif" font-size="12" font-weight="600" fill="#e4e4e7">refactor-rules.md</text>
+    <text x="228" y="322" font-family="system-ui,-apple-system,sans-serif" font-size="10" fill="#52525b">Follow existing patterns. Prefer small, focused changes. No new deps...</text>
+    <text x="708" y="287" font-family="system-ui,-apple-system,sans-serif" font-size="10" font-weight="500" fill="#818cf8">Edit</text>
+    <text x="722" y="308" font-family="system-ui,-apple-system,sans-serif" font-size="10" font-weight="500" fill="#71717a">Move</text>
+    <text x="716" y="324" font-family="system-ui,-apple-system,sans-serif" font-size="10" font-weight="500" fill="#ef4444">Delete</text>
+
+    <!-- Prompt entry 3 -->
+    <rect x="212" y="344" width="536" height="72" rx="12" fill="#ffffff" opacity="0.03"/>
+    <rect x="212" y="344" width="536" height="72" rx="12" fill="none" stroke="#ffffff" stroke-opacity="0.06"/>
+    <rect x="228" y="358" width="52" height="18" rx="9" fill="#f97316" opacity="0.12"/>
+    <text x="238" y="371" font-family="system-ui,-apple-system,sans-serif" font-size="8" font-weight="700" fill="#fdba74">CLAUDE</text>
+    <rect x="288" y="358" width="48" height="18" rx="9" fill="#6366f1" opacity="0.12"/>
+    <text x="298" y="371" font-family="system-ui,-apple-system,sans-serif" font-size="8" font-weight="700" fill="#818cf8">GLOBAL</text>
+    <text x="228" y="392" font-family="system-ui,-apple-system,sans-serif" font-size="12" font-weight="600" fill="#e4e4e7">testing-guide.md</text>
+    <text x="228" y="406" font-family="system-ui,-apple-system,sans-serif" font-size="10" fill="#52525b">Write unit tests using Vitest. Cover edge cases. Mock external deps...</text>
+    <text x="708" y="371" font-family="system-ui,-apple-system,sans-serif" font-size="10" font-weight="500" fill="#818cf8">Edit</text>
+    <text x="722" y="392" font-family="system-ui,-apple-system,sans-serif" font-size="10" font-weight="500" fill="#71717a">Move</text>
+    <text x="716" y="408" font-family="system-ui,-apple-system,sans-serif" font-size="10" font-weight="500" fill="#ef4444">Delete</text>
+
+    <!-- Prompt entry 4 -->
+    <rect x="212" y="428" width="536" height="72" rx="12" fill="#ffffff" opacity="0.03"/>
+    <rect x="212" y="428" width="536" height="72" rx="12" fill="none" stroke="#ffffff" stroke-opacity="0.06"/>
+    <rect x="228" y="442" width="54" height="18" rx="9" fill="#8b5cf6" opacity="0.12"/>
+    <text x="238" y="455" font-family="system-ui,-apple-system,sans-serif" font-size="8" font-weight="700" fill="#c4b5fd">CURSOR</text>
+    <rect x="290" y="442" width="54" height="18" rx="9" fill="#10b981" opacity="0.12"/>
+    <text x="300" y="455" font-family="system-ui,-apple-system,sans-serif" font-size="8" font-weight="700" fill="#34d399">PROJECT</text>
+    <text x="228" y="476" font-family="system-ui,-apple-system,sans-serif" font-size="12" font-weight="600" fill="#e4e4e7">api-conventions.md</text>
+    <text x="228" y="490" font-family="system-ui,-apple-system,sans-serif" font-size="10" fill="#52525b">Use RESTful conventions. All endpoints return { ok, data } or { ok, error }...</text>
+    <text x="708" y="455" font-family="system-ui,-apple-system,sans-serif" font-size="10" font-weight="500" fill="#818cf8">Edit</text>
+    <text x="722" y="476" font-family="system-ui,-apple-system,sans-serif" font-size="10" font-weight="500" fill="#71717a">Move</text>
+    <text x="716" y="492" font-family="system-ui,-apple-system,sans-serif" font-size="10" font-weight="500" fill="#ef4444">Delete</text>
+  </g>
+</svg>

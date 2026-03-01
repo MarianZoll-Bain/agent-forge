@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#4338ca"/>
+      <stop offset="50%" stop-color="#6366f1"/>
+      <stop offset="100%" stop-color="#7c3aed"/>
+    </linearGradient>
+    <linearGradient id="glow" x1="0.5" y1="0" x2="0.5" y2="1">
+      <stop offset="0%" stop-color="#c7d2fe" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#c7d2fe" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Rounded square background -->
+  <rect width="1024" height="1024" rx="224" fill="url(#bg)"/>
+
+  <!-- Subtle top glow -->
+  <rect width="1024" height="512" rx="224" fill="url(#glow)"/>
+
+  <!-- Three parallel worktree branches — the core metaphor -->
+  <!-- Left branch -->
+  <path d="M300 760 L300 440 Q300 380 340 340 L420 260" stroke="#ffffff" stroke-width="48" stroke-linecap="round" stroke-linejoin="round" opacity="0.35"/>
+  <!-- Center branch (main) -->
+  <path d="M512 760 L512 260" stroke="#ffffff" stroke-width="56" stroke-linecap="round" opacity="0.9"/>
+  <!-- Right branch -->
+  <path d="M724 760 L724 440 Q724 380 684 340 L604 260" stroke="#ffffff" stroke-width="48" stroke-linecap="round" stroke-linejoin="round" opacity="0.35"/>
+
+  <!-- Branch fork dots — where worktrees split -->
+  <circle cx="512" cy="420" r="36" fill="#ffffff" opacity="0.9"/>
+  <circle cx="300" cy="440" r="24" fill="#ffffff" opacity="0.5"/>
+  <circle cx="724" cy="440" r="24" fill="#ffffff" opacity="0.5"/>
+
+  <!-- Small agent indicator dots at branch tips -->
+  <circle cx="420" cy="260" r="20" fill="#a5b4fc"/>
+  <circle cx="512" cy="260" r="24" fill="#ffffff"/>
+  <circle cx="604" cy="260" r="20" fill="#a5b4fc"/>
+
+  <!-- Anvil / forge base -->
+  <rect x="220" y="740" width="584" height="56" rx="28" fill="#ffffff" opacity="0.15"/>
+</svg>

@@ -16,9 +16,13 @@ if (isDev) {
 
 function createWindow(): BrowserWindow {
   const preloadPath = join(__dirname, '../preload/index.js')
+  const iconExt = process.platform === 'darwin' ? 'icns' : process.platform === 'win32' ? 'ico' : 'png'
+  const iconPath = join(__dirname, `../../resources/icon.${iconExt}`)
+
   const win = new BrowserWindow({
     width: 1000,
     height: 700,
+    icon: iconPath,
     webPreferences: {
       preload: preloadPath,
       contextIsolation: true,

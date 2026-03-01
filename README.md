@@ -30,22 +30,22 @@ Stop waiting for one agent to finish before starting the next. AgentForge lets y
 
 ## Screenshots
 
-### Light mode
+### Workbench — multiple worktrees with PR status
 
 <p align="center">
-  <img src="docs/screenshots/board-light.svg" alt="AgentForge board — light mode" width="100%"/>
+  <img src="docs/screenshots/board-dark.svg" alt="AgentForge workbench showing multiple worktrees with PR status badges" width="100%"/>
 </p>
 
-### Dark mode
+### Prompt management
 
 <p align="center">
-  <img src="docs/screenshots/board-dark.svg" alt="AgentForge board — dark mode" width="100%"/>
+  <img src="docs/screenshots/prompts.svg" alt="Prompt library — per-tool and per-project scoping" width="100%"/>
 </p>
 
-### All tests passing
+### Settings
 
 <p align="center">
-  <img src="docs/screenshots/tests-passing.svg" alt="Test suite — 17 tests passing" width="100%"/>
+  <img src="docs/screenshots/settings.svg" alt="Settings panel — tools, appearance, and configuration" width="100%"/>
 </p>
 
 ---
