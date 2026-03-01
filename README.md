@@ -20,33 +20,19 @@ Stop waiting for one agent to finish before starting the next. AgentForge lets y
 
 ### Built for teams and solo devs who use AI heavily
 
-- **Parallel execution** — 5 agents, 5 features, one repo, zero conflicts
+<p align="center">
+  <img src="docs/screenshots/workbench.png" alt="Workbench — manage multiple worktrees with PR status" width="32%"/>
+  &nbsp;
+  <img src="docs/screenshots/prompts.png" alt="Prompt library — per-tool and per-project scoping" width="32%"/>
+  &nbsp;
+  <img src="docs/screenshots/settings.png" alt="Settings — tools, appearance, and configuration" width="32%"/>
+</p>
+
+- **Parallel execution** — 5+ agents, 5+ features, one repo, zero conflicts
 - **Tool-agnostic** — Cursor, Claude CLI, or Ollama. Mix and match per task.
 - **Git-native** — real worktrees, real branches, real commits. No magic layers.
 - **Offline-ready** — fly at 35,000 feet and keep shipping with local models
 - **Dark mode** — because you'll be staring at this all day
-
----
-
-## Screenshots
-
-### Workbench — multiple worktrees with PR status
-
-<p align="center">
-  <img src="docs/screenshots/board-dark.svg" alt="AgentForge workbench showing multiple worktrees with PR status badges" width="100%"/>
-</p>
-
-### Prompt management
-
-<p align="center">
-  <img src="docs/screenshots/prompts.svg" alt="Prompt library — per-tool and per-project scoping" width="100%"/>
-</p>
-
-### Settings
-
-<p align="center">
-  <img src="docs/screenshots/settings.svg" alt="Settings panel — tools, appearance, and configuration" width="100%"/>
-</p>
 
 ---
 
