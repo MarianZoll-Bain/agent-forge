@@ -51,9 +51,9 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
   const secondaryBtn = 'px-4 py-2 text-sm rounded-xl border border-slate-200 dark:border-white/[0.08] text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-zinc-800 font-medium'
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-gradient-to-br from-slate-50 via-white to-indigo-50/80 dark:from-zinc-950 dark:via-zinc-900 dark:to-indigo-950/30 relative">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-gradient-to-br from-slate-50 via-white to-indigo-50/80 dark:from-zinc-950 dark:via-zinc-900 dark:to-indigo-950/30">
       <div className="pointer-events-none absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-indigo-400/10 dark:bg-indigo-500/[0.06] rounded-full blur-3xl" />
-      <div className="relative w-full max-w-lg rounded-2xl glass-heavy shadow-elevated border border-slate-200/60 dark:border-white/[0.06] p-10 flex flex-col gap-7">
+      <div className="relative w-full max-w-lg mx-auto rounded-2xl glass-heavy shadow-elevated border border-slate-200/60 dark:border-white/[0.06] p-10 flex flex-col gap-7">
         {/* Progress */}
         <div className="flex items-center gap-2 justify-center">
           {steps.map((s, i) => (

@@ -66,24 +66,24 @@ export function ToolToggle({ tool, label, enabled, onToggle }: ToolToggleProps) 
         />
       </button>
       <span className="text-sm text-slate-800 dark:text-slate-200 font-semibold min-w-[120px]">{label}</span>
-      <span className="text-xs flex items-center gap-1.5">
+      <span className="text-xs flex items-center gap-1.5 min-w-0 overflow-x-auto scrollbar-none">
         {verify.status === 'verifying' && (
-          <span className="text-indigo-500 dark:text-indigo-400 font-medium">Verifying...</span>
+          <span className="text-indigo-500 dark:text-indigo-400 font-medium whitespace-nowrap">Verifying...</span>
         )}
         {verify.status === 'success' && (
           <>
-            <svg className="w-3.5 h-3.5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-3.5 h-3.5 shrink-0 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
             </svg>
-            <span className="text-emerald-600 dark:text-emerald-400 font-mono font-medium">{verify.version}</span>
+            <span className="text-emerald-600 dark:text-emerald-400 font-mono font-medium whitespace-nowrap">{verify.version}</span>
           </>
         )}
         {verify.status === 'error' && (
           <>
-            <svg className="w-3.5 h-3.5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-3.5 h-3.5 shrink-0 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
             </svg>
-            <span className="text-red-500 dark:text-red-400 font-medium">{verify.message}</span>
+            <span className="text-red-500 dark:text-red-400 font-medium whitespace-nowrap">{verify.message}</span>
           </>
         )}
       </span>
