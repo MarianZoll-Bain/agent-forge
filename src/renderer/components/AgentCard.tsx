@@ -312,13 +312,21 @@ export function AgentCard({ agent, onRemove }: AgentCardProps) {
             <span className="text-xs text-slate-400 dark:text-slate-500 italic">Checking PR...</span>
           ) : prStatus?.hasPR ? (
             <>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400">
-                PR #{prStatus.prNumber}
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide ${
+                prStatus.isDraft
+                  ? 'bg-slate-200 text-slate-600 dark:bg-slate-600/30 dark:text-slate-400'
+                  : prStatus.prState === 'MERGED'
+                    ? 'bg-purple-100 text-purple-700 dark:bg-purple-500/15 dark:text-purple-400'
+                    : prStatus.prState === 'CLOSED'
+                      ? 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400'
+                      : 'bg-green-100 text-green-700 dark:bg-green-500/15 dark:text-green-400'
+              }`}>
+                PR #{prStatus.prNumber}{prStatus.prState ? ` · ${prStatus.isDraft ? 'Draft' : prStatus.prState === 'MERGED' ? 'Merged' : prStatus.prState === 'CLOSED' ? 'Closed' : 'Open'}` : ''}
               </span>
               {prStatus.prUrl && (
                 <button
                   type="button"
-                  onClick={() => window.open(prStatus.prUrl, '_blank')}
+                  onClick={() => window.agentForge?.openExternal(prStatus.prUrl!)}
                   className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline font-medium"
                 >
                   Open PR

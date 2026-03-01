@@ -289,6 +289,7 @@ export interface AgentPRStatusResult {
   prUrl?: string
   prNumber?: number
   prState?: string
+  isDraft?: boolean
 }
 
 export interface AgentPRStatusError {
@@ -298,6 +299,11 @@ export interface AgentPRStatusError {
 }
 
 export type AgentPRStatusResponse = AgentPRStatusResult | AgentPRStatusError
+
+// ---- Shell channels ----
+
+/** Open a URL in the user's default browser */
+export const SHELL_OPEN_EXTERNAL = 'shell:openExternal' as const
 
 // ---- Preload API (allowlisted only) ----
 
@@ -317,6 +323,7 @@ export type PreloadAPI = {
   verifyTool: (payload: ToolsVerifyPayload) => Promise<ToolsVerifyResponse>
   resetApp: () => Promise<AppResetResponse>
   getAgentPRStatus: (payload: AgentPRStatusPayload) => Promise<AgentPRStatusResponse>
+  openExternal: (url: string) => Promise<void>
 }
 
 declare global {

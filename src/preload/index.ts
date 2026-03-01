@@ -48,6 +48,8 @@ const api = {
     ipcRenderer.invoke('app:reset'),
   getAgentPRStatus: (payload: AgentPRStatusPayload) =>
     ipcRenderer.invoke('agent:prStatus', payload),
+  openExternal: (url: string) =>
+    ipcRenderer.invoke('shell:openExternal', url),
 }
 
 contextBridge.exposeInMainWorld('agentForge', api)

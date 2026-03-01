@@ -3,7 +3,7 @@
  * Simplified: worktree management + native opener. No embedded agent execution.
  */
 
-import { ipcMain } from 'electron'
+import { ipcMain, shell } from 'electron'
 import type { BrowserWindow } from 'electron'
 import { z } from 'zod'
 import { validateRepoPath } from './services/repoValidator'
@@ -587,5 +587,13 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('app:reset', (event) => {
     return handleAppReset(event)
+  })
+
+  ipcMain.handle('shell:openExternal', (event, url: unknown) => {
+    if (!isSenderAllowed(event)) return
+    if (typeof url !== 'string') return
+    const parsed = z.string().url().safeParse(url)
+    if (!parsed.success) return
+    return shell.openExternal(parsed.data)
   })
 }
