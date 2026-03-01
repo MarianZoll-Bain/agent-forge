@@ -7,7 +7,11 @@ import { app, BrowserWindow } from 'electron'
 import { join } from 'path'
 import { registerIpcHandlers, setMainWindow } from './ipcHandlers'
 import { initAutoUpdater, stopAutoUpdater } from './services/autoUpdater'
+import { fixPath } from './services/fixPath'
 import { logger } from './logger'
+
+// Fix PATH before anything else — packaged macOS apps get a minimal PATH
+fixPath()
 
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged
 
