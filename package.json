@@ -3,7 +3,7 @@
   "version": "0.0.1",
   "description": "Desktop app to orchestrate multiple coding agents in isolated Git worktrees",
   "main": "out/main/index.js",
-  "author": "",
+  "author": "AgentForge <hello@agentforge.dev>",
   "license": "MIT",
   "scripts": {
     "dev": "electron-vite dev --watch",
@@ -53,7 +53,8 @@
     "publish": {
       "provider": "github",
       "owner": "MarianZoll-Bain",
-      "repo": "agent-forge"
+      "repo": "agent-forge",
+      "releaseType": "release"
     },
     "mac": {
       "target": [
