@@ -393,20 +393,21 @@ export function AgentCard({ agent, onRemove }: AgentCardProps) {
                     ? 'bg-purple-100 text-purple-700 dark:bg-purple-500/15 dark:text-purple-400'
                     : prStatus.prState === 'CLOSED'
                       ? 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400'
-                      : 'bg-green-100 text-green-700 dark:bg-green-500/15 dark:text-green-400'
+                      : prStatus.reviewDecision === 'APPROVED'
+                        ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400'
+                        : prStatus.reviewDecision === 'CHANGES_REQUESTED'
+                          ? 'bg-orange-100 text-orange-700 dark:bg-orange-500/15 dark:text-orange-400'
+                          : 'bg-green-100 text-green-700 dark:bg-green-500/15 dark:text-green-400'
               }`}>
-                PR #{prStatus.prNumber}{prStatus.prState ? ` · ${prStatus.isDraft ? 'Draft' : prStatus.prState === 'MERGED' ? 'Merged' : prStatus.prState === 'CLOSED' ? 'Closed' : 'Open'}` : ''}
+                PR #{prStatus.prNumber}{prStatus.prState ? ` · ${
+                  prStatus.isDraft ? 'Draft'
+                    : prStatus.prState === 'MERGED' ? 'Merged'
+                    : prStatus.prState === 'CLOSED' ? 'Closed'
+                    : prStatus.reviewDecision === 'APPROVED' ? 'Approved'
+                    : prStatus.reviewDecision === 'CHANGES_REQUESTED' ? 'Changes Requested'
+                    : 'Open'
+                }` : ''}
               </span>
-              {prStatus.reviewDecision === 'APPROVED' && (
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400">
-                  Approved
-                </span>
-              )}
-              {prStatus.reviewDecision === 'CHANGES_REQUESTED' && (
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide bg-orange-100 text-orange-700 dark:bg-orange-500/15 dark:text-orange-400">
-                  Changes Requested
-                </span>
-              )}
               {prStatus.prUrl && (
                 <button
                   type="button"
