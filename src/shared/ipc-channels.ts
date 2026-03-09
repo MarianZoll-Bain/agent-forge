@@ -313,6 +313,7 @@ export interface AgentPRStatusResult {
   prNumber?: number
   prState?: string
   isDraft?: boolean
+  reviewDecision?: string
 }
 
 export interface AgentPRStatusError {

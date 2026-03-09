@@ -9,6 +9,7 @@ export interface PRStatus {
   prNumber?: number
   prState?: string // 'OPEN' | 'CLOSED' | 'MERGED'
   isDraft?: boolean
+  reviewDecision?: string // 'APPROVED' | 'CHANGES_REQUESTED' | 'REVIEW_REQUIRED' | ''
 }
 
 export type PRStatusResult = { ok: true } & PRStatus
@@ -22,10 +23,10 @@ export async function getPRStatus(worktreePath: string, branchName: string): Pro
     const { execa } = await import('execa')
     const { stdout } = await execa(
       'gh',
-      ['pr', 'view', branchName, '--json', 'url,state,number,isDraft'],
+      ['pr', 'view', branchName, '--json', 'url,state,number,isDraft,reviewDecision'],
       { cwd: worktreePath, timeout: TIMEOUT_MS },
     )
-    const parsed = JSON.parse(stdout) as { url?: string; state?: string; number?: number; isDraft?: boolean }
+    const parsed = JSON.parse(stdout) as { url?: string; state?: string; number?: number; isDraft?: boolean; reviewDecision?: string }
     return {
       ok: true,
       hasPR: true,
@@ -33,6 +34,7 @@ export async function getPRStatus(worktreePath: string, branchName: string): Pro
       prNumber: typeof parsed.number === 'number' ? parsed.number : undefined,
       prState: typeof parsed.state === 'string' ? parsed.state : undefined,
       isDraft: typeof parsed.isDraft === 'boolean' ? parsed.isDraft : undefined,
+      reviewDecision: typeof parsed.reviewDecision === 'string' ? parsed.reviewDecision : undefined,
     }
   } catch (e: unknown) {
     // gh exits non-zero when no PR exists for the branch
