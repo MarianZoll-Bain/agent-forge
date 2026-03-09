@@ -8,6 +8,9 @@
 /** Select repository: open folder picker, validate git + origin, return repo info or error */
 export const REPO_SELECT = 'repo:select' as const
 
+/** Pull latest changes on the root repo's main branch */
+export const REPO_PULL = 'repo:pull' as const
+
 /** Get current app state (after load or after any mutation) */
 export const STATE_GET = 'state:get' as const
 
@@ -29,6 +32,24 @@ export interface RepoSelectError {
 }
 
 export type RepoSelectResponse = RepoSelectResult | RepoSelectError
+
+export interface RepoPullPayload {
+  branch: string
+}
+
+export interface RepoPullResult {
+  ok: true
+  updatedSha: string
+  summary: string
+}
+
+export interface RepoPullError {
+  ok: false
+  code: string
+  message: string
+}
+
+export type RepoPullResponse = RepoPullResult | RepoPullError
 
 export interface StateGetResponse {
   state: import('./types').AppState
@@ -328,6 +349,7 @@ export interface AppVersionResponse {
 
 export type PreloadAPI = {
   selectRepository: () => Promise<RepoSelectResponse>
+  pullRepo: (payload: RepoPullPayload) => Promise<RepoPullResponse>
   getState: () => Promise<StateGetResponse>
   validateBranchName: (payload: AgentValidateBranchPayload) => Promise<AgentValidateBranchResponse>
   createAgent: (payload: AgentCreatePayload) => Promise<AgentCreateResponse>

@@ -8,6 +8,9 @@ import { useAppStore } from '../store/useAppStore'
 export function ProjectBar() {
   const repoName = useAppStore((s) => s.repoName())
   const refreshState = useAppStore((s) => s.refreshState)
+  const pullMain = useAppStore((s) => s.pullMain)
+  const pullingMain = useAppStore((s) => s.pullingMain)
+  const baseBranch = useAppStore((s) => s.state?.settings.baseBranch || 'main')
   const [switching, setSwitching] = useState(false)
 
   if (!repoName) return null
@@ -41,14 +44,35 @@ export function ProjectBar() {
           </span>
         </div>
       </div>
-      <button
-        type="button"
-        onClick={handleSwitchProject}
-        disabled={switching}
-        className="ml-auto text-xs font-semibold px-3 py-1 rounded-lg text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 disabled:opacity-50 transition-colors"
-      >
-        {switching ? 'Switching...' : 'Switch'}
-      </button>
+      <div className="ml-auto flex items-center gap-1.5">
+        <button
+          type="button"
+          onClick={pullMain}
+          disabled={pullingMain}
+          title={`git pull --ff-only origin ${baseBranch}`}
+          className="text-xs font-semibold px-3 py-1 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/[0.06] disabled:opacity-50 transition-colors flex items-center gap-1.5"
+        >
+          {pullingMain ? (
+            <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+          ) : (
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+          )}
+          {pullingMain ? 'Pulling...' : `Update ${baseBranch}`}
+        </button>
+        <button
+          type="button"
+          onClick={handleSwitchProject}
+          disabled={switching}
+          className="text-xs font-semibold px-3 py-1 rounded-lg text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 disabled:opacity-50 transition-colors"
+        >
+          {switching ? 'Switching...' : 'Switch'}
+        </button>
+      </div>
     </div>
   )
 }

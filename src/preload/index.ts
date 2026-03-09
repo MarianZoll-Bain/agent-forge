@@ -13,6 +13,7 @@ import type {
   SettingsUpdatePayload,
   AgentGitStatusPayload,
   AgentRemovePayload,
+  RepoPullPayload,
   PromptsSavePayload,
   PromptsDeletePayload,
   PromptsChangeScopePayload,
@@ -22,6 +23,8 @@ import type {
 
 const api = {
   selectRepository: () => ipcRenderer.invoke('repo:select'),
+  pullRepo: (payload: RepoPullPayload) =>
+    ipcRenderer.invoke('repo:pull', payload),
   getState: () => ipcRenderer.invoke('state:get'),
   validateBranchName: (payload: AgentValidateBranchPayload) =>
     ipcRenderer.invoke('agent:validateBranch', payload),

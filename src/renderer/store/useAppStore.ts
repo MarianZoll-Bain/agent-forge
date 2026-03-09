@@ -84,6 +84,11 @@ interface AppStoreState {
   /** Agent IDs currently being refreshed by the bulk action. */
   agentRefreshingIds: Set<string>
 
+  /** Pull latest changes on root repo's main branch. */
+  pullMain: () => Promise<void>
+  /** True while pulling main branch. */
+  pullingMain: boolean
+
   /** Apply theme based on settings.darkMode + system preference. */
   applyTheme: () => void
   /** Cycle dark mode: undefined→true→false→undefined (system→dark→light→system). */
@@ -131,6 +136,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
   toasts: [],
   prompts: [],
   promptsLoading: false,
+  pullingMain: false,
   refreshingAllStatuses: false,
   agentRefreshingIds: new Set<string>(),
   selectedPromptId: null,
@@ -263,6 +269,26 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
       prompts: [...s.prompts, prompt],
       selectedPromptId: prompt.id,
     })),
+
+  pullMain: async () => {
+    const api = window.agentForge
+    if (!api) return
+    const branch = get().state?.settings.baseBranch || 'main'
+    set({ pullingMain: true })
+    try {
+      const result = await api.pullRepo({ branch })
+      if (result.ok) {
+        get().addToast(`Updated ${branch} (${result.updatedSha})`, 'success')
+      } else {
+        get().addToast(`Pull failed: ${result.message}`, 'error')
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Pull failed'
+      get().addToast(msg, 'error')
+    } finally {
+      set({ pullingMain: false })
+    }
+  },
 
   applyTheme: () => {
     const darkMode = get().state?.settings.darkMode

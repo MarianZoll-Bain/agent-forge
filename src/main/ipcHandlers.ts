@@ -13,7 +13,7 @@ import { loadState, saveState } from './services/stateManager'
 import { validateBranchName } from './services/gitValidator'
 import { createWorktreeForAgent, discoverExistingWorktrees } from './services/agentService'
 import { getGitStatus } from './services/gitStatusService'
-import { removeWorktree } from './services/gitOperations'
+import { removeWorktree, pullMainBranch } from './services/gitOperations'
 import { openAgent } from './services/agentOpener'
 import * as promptManager from './services/promptManager'
 import { verifyTool } from './services/toolVerifier'
@@ -22,6 +22,7 @@ import { getAppVersion, getUpdateStatus, checkForUpdates, downloadUpdate, instal
 import type {
   RepoSelectResponse,
   RepoSelectResult,
+  RepoPullResponse,
   StateGetResponse,
   AgentValidateBranchResponse,
   AgentCreateResponse,
@@ -167,6 +168,29 @@ async function handleGetState(event: Electron.IpcMainInvokeEvent): Promise<State
   return { state, warning }
 }
 
+async function handleRepoPull(
+  event: Electron.IpcMainInvokeEvent,
+  payload: unknown,
+): Promise<RepoPullResponse> {
+  if (!isSenderAllowed(event)) {
+    return { ok: false, code: 'FORBIDDEN', message: 'Invalid sender' }
+  }
+  const parsed = RepoPullSchema.safeParse(payload)
+  if (!parsed.success) {
+    return { ok: false, code: 'VALIDATION_FAILED', message: 'branch is required' }
+  }
+  const stateResult = loadState()
+  if (!stateResult.ok) {
+    return { ok: false, code: stateResult.code, message: stateResult.message }
+  }
+  const { repoPath } = stateResult.state
+  if (!repoPath) {
+    return { ok: false, code: 'NO_REPO', message: 'No repository selected' }
+  }
+  logger.info('repo:pull', parsed.data.branch)
+  return pullMainBranch(repoPath, parsed.data.branch)
+}
+
 // ---- Zod schemas ----
 
 const AgentValidateBranchSchema = z.object({
@@ -202,6 +226,7 @@ const SettingsUpdateSchema = z.object({
   }),
 })
 
+const RepoPullSchema = z.object({ branch: z.string().min(1) })
 const AgentGitStatusSchema = z.object({ agentId: z.string().min(1) })
 const AgentRemoveSchema = z.object({
   agentId: z.string().min(1),
@@ -533,6 +558,10 @@ async function handleAppReset(
 export function registerIpcHandlers(): void {
   ipcMain.handle('repo:select', (event) => {
     return handleSelectRepository(event)
+  })
+
+  ipcMain.handle('repo:pull', (event, payload: unknown) => {
+    return handleRepoPull(event, payload)
   })
 
   ipcMain.handle('state:get', (event) => {
