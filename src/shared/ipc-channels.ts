@@ -32,6 +32,7 @@ export type RepoSelectResponse = RepoSelectResult | RepoSelectError
 
 export interface StateGetResponse {
   state: import('./types').AppState
+  warning?: { code: string; message: string }
 }
 
 // ---- Agent channels ----
@@ -126,6 +127,7 @@ export interface AgentGitStatusResult {
   dirty: boolean
   branch: string
   lastCommitSha: string
+  lastCommitDate?: string
   aheadBehind?: { ahead: number; behind: number }
 }
 

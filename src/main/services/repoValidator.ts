@@ -6,6 +6,7 @@
 
 import * as fs from 'node:fs'
 import * as path from 'node:path'
+import { isPermissionError, getPermissionGuidance } from './permissionCheck'
 
 export interface ValidationResult {
   valid: boolean
@@ -59,6 +60,14 @@ export async function validateRepoPath(candidatePath: string): Promise<Validatio
       return { valid: false, error: 'Path is not a directory', code: 'NOT_DIRECTORY' }
     }
   } catch (e) {
+    if (isPermissionError(e)) {
+      const guidance = getPermissionGuidance(normalized)
+      return {
+        valid: false,
+        error: guidance ?? 'Permission denied when accessing this folder. Check your macOS Privacy & Security settings.',
+        code: 'PERMISSION_DENIED',
+      }
+    }
     const message = e instanceof Error ? e.message : String(e)
     return { valid: false, error: `Path does not exist or is not accessible: ${message}`, code: 'INVALID_PATH' }
   }

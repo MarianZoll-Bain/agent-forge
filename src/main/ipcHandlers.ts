@@ -147,6 +147,7 @@ async function handleGetState(event: Electron.IpcMainInvokeEvent): Promise<State
     throw Object.assign(new Error(result.message), { code: result.code })
   }
   const state = result.state
+  const warning = result.warning
 
   // Discover any new worktrees that appeared on disk since last save
   if (state.repoPath && state.worktreesRootPath) {
@@ -156,14 +157,14 @@ async function handleGetState(event: Electron.IpcMainInvokeEvent): Promise<State
         logger.info(`Discovered ${discovered.length} new worktree(s) on startup`)
         const updated: AppState = { ...state, agents: [...state.agents, ...discovered] }
         saveState(updated)
-        return { state: updated }
+        return { state: updated, warning }
       }
     } catch (e) {
       logger.warn('Worktree discovery on getState failed (non-fatal):', e instanceof Error ? e.message : e)
     }
   }
 
-  return { state }
+  return { state, warning }
 }
 
 // ---- Zod schemas ----
@@ -593,9 +594,11 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('shell:openExternal', (event, url: unknown) => {
     if (!isSenderAllowed(event)) return
     if (typeof url !== 'string') return
-    const parsed = z.string().url().safeParse(url)
-    if (!parsed.success) return
-    return shell.openExternal(parsed.data)
+    // Allow https URLs and macOS system settings deep-links
+    const isHttps = z.string().url().safeParse(url).success
+    const isSystemSettings = url.startsWith('x-apple.systempreferences:')
+    if (!isHttps && !isSystemSettings) return
+    return shell.openExternal(url)
   })
 
   // ---- App version + auto-update ----

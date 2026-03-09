@@ -13,6 +13,8 @@ export function AgentBoard() {
   const draftAgents = useAppStore((s) => s.draftAgents)
   const addDraftAgent = useAppStore((s) => s.addDraftAgent)
   const refreshState = useAppStore((s) => s.refreshState)
+  const refreshAllStatuses = useAppStore((s) => s.refreshAllStatuses)
+  const refreshingAll = useAppStore((s) => s.refreshingAllStatuses)
 
   function handleAdd() {
     addDraftAgent()
@@ -52,13 +54,32 @@ export function AgentBoard() {
         {isEmpty ? (
           <EmptyState />
         ) : (
-          <div className="p-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {draftAgents.map((draft) => (
-              <AgentSetupCard key={draft.id} draftId={draft.id} />
-            ))}
-            {agents.map((agent) => (
-              <AgentCard key={agent.id} agent={agent} onRemove={handleRemove} />
-            ))}
+          <div className="p-5">
+            {agents.length > 0 && (
+              <div className="flex justify-end mb-4">
+                <button
+                  type="button"
+                  onClick={refreshAllStatuses}
+                  disabled={refreshingAll}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-400 dark:text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 transition-colors disabled:opacity-50"
+                  title="Refresh all worktree statuses"
+                  aria-label="Refresh all worktree statuses"
+                >
+                  <svg className={`w-3.5 h-3.5 ${refreshingAll ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  <span>{refreshingAll ? 'Refreshing...' : 'Refresh all'}</span>
+                </button>
+              </div>
+            )}
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {draftAgents.map((draft) => (
+                <AgentSetupCard key={draft.id} draftId={draft.id} />
+              ))}
+              {agents.map((agent) => (
+                <AgentCard key={agent.id} agent={agent} onRemove={handleRemove} />
+              ))}
+            </div>
           </div>
         )}
       </div>

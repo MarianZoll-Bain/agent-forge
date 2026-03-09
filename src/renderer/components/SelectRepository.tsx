@@ -4,12 +4,15 @@
 
 import { useState } from 'react'
 import { useAppStore } from '../store/useAppStore'
+import { PermissionAlert } from './PermissionAlert'
 
 export function SelectRepository() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [errorCode, setErrorCode] = useState<string | null>(null)
   const refreshState = useAppStore((s) => s.refreshState)
   const setLoadError = useAppStore((s) => s.setLoadError)
+  const permissionWarning = useAppStore((s) => s.permissionWarning)
 
   const handleSelect = async () => {
     const api = window.agentForge
@@ -19,19 +22,21 @@ export function SelectRepository() {
     }
     setLoading(true)
     setError(null)
+    setErrorCode(null)
     setLoadError(null)
     try {
       const result = await api.selectRepository()
       if (result.ok) {
         await refreshState()
       } else {
-        const msg = result.code ? `[${result.code}] ${result.message}` : result.message
-        setError(msg)
+        setErrorCode(result.code ?? null)
+        setError(result.message)
       }
     } catch (e) {
       const err = e instanceof Error ? e : new Error(String(e))
       const code = (e as { code?: string }).code
-      setError(code ? `[${code}] ${err.message}` : err.message)
+      setErrorCode(code ?? null)
+      setError(err.message)
     } finally {
       setLoading(false)
     }
@@ -51,7 +56,20 @@ export function SelectRepository() {
         >
           {loading ? 'Opening...' : 'Select Repository'}
         </button>
-        {error && (
+        {permissionWarning && !error && (
+          <div className="mt-5">
+            <PermissionAlert
+              message={permissionWarning.message}
+              onDismiss={() => useAppStore.getState().setPermissionWarning(null)}
+            />
+          </div>
+        )}
+        {error && errorCode === 'PERMISSION_DENIED' && (
+          <div className="mt-5">
+            <PermissionAlert message={error} />
+          </div>
+        )}
+        {error && errorCode !== 'PERMISSION_DENIED' && (
           <div className="mt-5 p-3 rounded-xl bg-red-50 dark:bg-red-500/10 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-500/20 text-sm font-mono" role="alert">
             {error}
           </div>

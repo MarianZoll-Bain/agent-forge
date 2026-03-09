@@ -8,6 +8,7 @@ export interface GitStatus {
   dirty: boolean
   branch: string
   lastCommitSha: string
+  lastCommitDate?: string
   aheadBehind?: { ahead: number; behind: number }
 }
 
@@ -41,8 +42,9 @@ export async function getGitStatus(
     const statusResult = await execa('git', ['status', '--porcelain'], { cwd: worktreePath })
     const dirty = statusResult.stdout.trim().length > 0
 
-    // Last commit SHA (short, 7 chars) — may fail on a brand-new empty branch
+    // Last commit SHA (short, 7 chars) and date — may fail on a brand-new empty branch
     let lastCommitSha = ''
+    let lastCommitDate: string | undefined
     try {
       const shaResult = await execa('git', ['rev-parse', '--short', 'HEAD'], {
         cwd: worktreePath,
@@ -50,6 +52,15 @@ export async function getGitStatus(
       lastCommitSha = shaResult.stdout.trim()
     } catch {
       // No commits yet; keep empty string
+    }
+    try {
+      const dateResult = await execa('git', ['log', '-1', '--format=%aI'], {
+        cwd: worktreePath,
+      })
+      const d = dateResult.stdout.trim()
+      if (d) lastCommitDate = d
+    } catch {
+      // No commits yet; skip
     }
 
     // Ahead/behind — may fail if remote tracking branch does not exist yet
@@ -72,7 +83,7 @@ export async function getGitStatus(
       // Remote tracking branch may not exist; silently omit ahead/behind
     }
 
-    return { ok: true, status: { dirty, branch, lastCommitSha, aheadBehind } }
+    return { ok: true, status: { dirty, branch, lastCommitSha, lastCommitDate, aheadBehind } }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     return { ok: false, code: 'GIT_STATUS_FAILED', message: msg }

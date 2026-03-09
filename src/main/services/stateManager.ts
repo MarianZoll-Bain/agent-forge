@@ -11,6 +11,7 @@ import * as path from 'node:path'
 import { homedir } from 'node:os'
 import type { Agent, AppState, Settings } from '../../shared/types'
 import { CURRENT_STATE_VERSION, DEFAULT_SETTINGS } from '../../shared/types'
+import { isPermissionError, getPermissionGuidance } from './permissionCheck'
 
 const STATE_DIR = '.agent-forge'
 const OLD_STATE_DIR = '.mono-agent-orchestrator'
@@ -40,9 +41,15 @@ function migrateDirectory(): void {
   }
 }
 
+export interface StateWarning {
+  code: string
+  message: string
+}
+
 export interface LoadStateResult {
   ok: true
   state: AppState
+  warning?: StateWarning
 }
 
 export interface LoadStateError {
@@ -128,7 +135,10 @@ function validateAgentWorktrees(state: AppState): AppState {
     if (!agent.worktreePath) return false
     try {
       return fs.existsSync(agent.worktreePath) && fs.statSync(agent.worktreePath).isDirectory()
-    } catch {
+    } catch (e: unknown) {
+      // Keep the agent in state if the error is a permission denial — the worktree
+      // likely still exists but the OS is blocking access (e.g. macOS TCC).
+      if (isPermissionError(e)) return true
       return false
     }
   })
@@ -145,19 +155,32 @@ export function loadState(): LoadStateResponse {
     const raw = fs.readFileSync(statePath, 'utf-8')
     const parsed = JSON.parse(raw) as Record<string, unknown>
     let state = migrate(parsed)
+    let warning: StateWarning | undefined
     if (state.repoPath) {
       try {
         if (!fs.existsSync(state.repoPath) || !fs.statSync(state.repoPath).isDirectory()) {
           state = defaultState()
           saveState(state)
         }
-      } catch {
-        state = defaultState()
-        saveState(state)
+      } catch (e: unknown) {
+        if (isPermissionError(e)) {
+          // Keep state intact — the repo probably still exists but macOS is blocking access
+          const guidance = getPermissionGuidance(state.repoPath)
+          warning = {
+            code: 'PERMISSION_DENIED',
+            message: guidance ?? (
+              'Permission denied when accessing the repository folder. ' +
+              'Check System Settings > Privacy & Security > Files and Folders.'
+            ),
+          }
+        } else {
+          state = defaultState()
+          saveState(state)
+        }
       }
     }
     state = validateAgentWorktrees(state)
-    return { ok: true, state }
+    return { ok: true, state, warning }
   } catch (e: unknown) {
     const err = e as NodeJS.ErrnoException
     if (err.code === 'ENOENT') {

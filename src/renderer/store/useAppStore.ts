@@ -23,9 +23,15 @@ export interface DraftAgent {
   id: string
 }
 
+export interface PermissionWarning {
+  code: string
+  message: string
+}
+
 interface AppStoreState {
   state: AppState | null
   loadError: string | null
+  permissionWarning: PermissionWarning | null
   appVersion: string | null
   updateStatus: UpdateStatus | null
   draftAgents: DraftAgent[]
@@ -46,6 +52,7 @@ interface AppStoreState {
 
   setState: (state: AppState) => void
   setLoadError: (error: string | null) => void
+  setPermissionWarning: (warning: PermissionWarning | null) => void
   setAppVersion: (version: string) => void
   setUpdateStatus: (status: UpdateStatus) => void
   setShowOnboarding: (show: boolean) => void
@@ -69,6 +76,13 @@ interface AppStoreState {
   updatePromptInList: (prompt: PromptEntry) => void
   removePromptFromList: (id: string) => void
   addPromptToList: (prompt: PromptEntry) => void
+
+  /** Refresh git + PR status for all agents at once. */
+  refreshAllStatuses: () => Promise<void>
+  /** True while a bulk refresh is in progress. */
+  refreshingAllStatuses: boolean
+  /** Agent IDs currently being refreshed by the bulk action. */
+  agentRefreshingIds: Set<string>
 
   /** Apply theme based on settings.darkMode + system preference. */
   applyTheme: () => void
@@ -108,6 +122,7 @@ function applyThemeToDOM(theme: 'light' | 'dark', darkMode: boolean | undefined)
 export const useAppStore = create<AppStoreState>((set, get) => ({
   state: null,
   loadError: null,
+  permissionWarning: null,
   appVersion: null,
   updateStatus: null,
   draftAgents: [],
@@ -116,6 +131,8 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
   toasts: [],
   prompts: [],
   promptsLoading: false,
+  refreshingAllStatuses: false,
+  agentRefreshingIds: new Set<string>(),
   selectedPromptId: null,
   showOnboarding: false,
   resolvedTheme: document.documentElement.classList.contains('dark') ? 'dark' : 'light',
@@ -129,6 +146,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
     set({ resolvedTheme: resolved })
   },
   setLoadError: (loadError) => set({ loadError }),
+  setPermissionWarning: (permissionWarning) => set({ permissionWarning }),
   setAppVersion: (appVersion) => set({ appVersion }),
   setUpdateStatus: (updateStatus) => set({ updateStatus }),
   setShowOnboarding: (showOnboarding) => set({ showOnboarding }),
@@ -147,11 +165,49 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
     const api = window.agentForge
     if (!api) return
     try {
-      const { state } = await api.getState()
-      set({ state, loadError: null })
+      const { state, warning } = await api.getState()
+      set({ state, loadError: null, permissionWarning: warning ?? null })
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Failed to refresh state'
       set({ loadError: msg })
+    }
+  },
+
+  refreshAllStatuses: async () => {
+    const api = window.agentForge
+    if (!api) return
+    const agents = get().state?.agents ?? []
+    if (agents.length === 0) return
+    const enableGitMode = get().state?.settings.enableGitMode
+    const allIds = new Set(agents.map((a) => a.id))
+    set({ refreshingAllStatuses: true, agentRefreshingIds: allIds })
+    try {
+      await Promise.all(
+        agents.map(async (agent) => {
+          try {
+            const gitResult = await api.getAgentGitStatus({ agentId: agent.id })
+            if (gitResult.ok) {
+              get().setAgentGitStatus(agent.id, gitResult)
+            }
+          } catch { /* ignore individual failures */ }
+          if (enableGitMode) {
+            try {
+              const prResult = await api.getAgentPRStatus({ agentId: agent.id })
+              if (prResult.ok) {
+                get().setAgentPRStatus(agent.id, prResult)
+              }
+            } catch { /* ignore individual failures */ }
+          }
+          // Mark this agent as done
+          set((s) => {
+            const next = new Set(s.agentRefreshingIds)
+            next.delete(agent.id)
+            return { agentRefreshingIds: next }
+          })
+        }),
+      )
+    } finally {
+      set({ refreshingAllStatuses: false, agentRefreshingIds: new Set() })
     }
   },
 

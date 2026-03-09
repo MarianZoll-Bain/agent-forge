@@ -6,13 +6,15 @@ import { useEffect, useState } from 'react'
 import { SelectRepository } from './components/SelectRepository'
 import { MainLayout } from './components/MainLayout'
 import { OnboardingWizard } from './components/OnboardingWizard'
+import { PermissionAlert } from './components/PermissionAlert'
 import { useAppStore } from './store/useAppStore'
 import { ToastContainer } from './components/Toast'
 import { ErrorBoundary } from './components/ErrorBoundary'
 
 export default function App() {
-  const { setState, setLoadError, setAppVersion, setUpdateStatus, addToast, hasRepo, showOnboarding, setShowOnboarding, applyTheme } = useAppStore()
+  const { setState, setLoadError, setPermissionWarning, setAppVersion, setUpdateStatus, addToast, hasRepo, showOnboarding, setShowOnboarding, applyTheme } = useAppStore()
   const state = useAppStore((s) => s.state)
+  const permissionWarning = useAppStore((s) => s.permissionWarning)
   const [initialized, setInitialized] = useState(false)
 
   useEffect(() => {
@@ -25,9 +27,10 @@ export default function App() {
 
     api
       .getState()
-      .then(({ state: loaded }) => {
+      .then(({ state: loaded, warning }) => {
         setState(loaded)
         setLoadError(null)
+        setPermissionWarning(warning ?? null)
         applyTheme()
         setInitialized(true)
       })
@@ -52,7 +55,7 @@ export default function App() {
     })
 
     return unsubscribe
-  }, [setState, setLoadError, setAppVersion, setUpdateStatus, addToast, applyTheme])
+  }, [setState, setLoadError, setPermissionWarning, setAppVersion, setUpdateStatus, addToast, applyTheme])
 
   async function handleOnboardingComplete(settings: {
     enableCursor: boolean
@@ -111,6 +114,14 @@ export default function App() {
 
   return (
     <ErrorBoundary>
+      {permissionWarning && (
+        <div className="px-4 pt-2">
+          <PermissionAlert
+            message={permissionWarning.message}
+            onDismiss={() => setPermissionWarning(null)}
+          />
+        </div>
+      )}
       <MainLayout />
       <ToastContainer />
     </ErrorBoundary>

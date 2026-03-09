@@ -32,6 +32,50 @@ export function AgentSetupCard({ draftId }: Props) {
 
   const branchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  /** Validate a branch name immediately (no debounce). Returns true if valid. */
+  const validateBranchNow = useCallback(async (name: string): Promise<boolean> => {
+    if (!name) {
+      setBranchError('Branch name is required')
+      setBranchValidating(false)
+      return false
+    }
+    setBranchValidating(true)
+    setBranchError(null)
+    const api = window.agentForge
+    if (!api) {
+      setBranchError('App API not available')
+      setBranchValidating(false)
+      return false
+    }
+    try {
+      const result = await api.validateBranchName({ branchName: name })
+      const errMsg = result.valid ? null : (result.message ?? 'Invalid branch name')
+      setBranchError(errMsg)
+      return result.valid
+    } catch {
+      setBranchError('Failed to validate branch name')
+      return false
+    } finally {
+      setBranchValidating(false)
+    }
+  }, [])
+
+  /** Validate with 350 ms debounce (used while typing). */
+  const validateBranch = useCallback((name: string) => {
+    if (!name) {
+      setBranchError('Branch name is required')
+      setBranchValidating(false)
+      return
+    }
+    setBranchValidating(true)
+    setBranchError(null)
+    if (branchDebounceRef.current) clearTimeout(branchDebounceRef.current)
+    branchDebounceRef.current = setTimeout(() => {
+      branchDebounceRef.current = null
+      validateBranchNow(name)
+    }, 350)
+  }, [validateBranchNow])
+
   function resolveNameInput(raw: string) {
     const trimmed = raw.trim()
     if (!trimmed) {
@@ -60,33 +104,6 @@ export function AgentSetupCard({ draftId }: Props) {
     resolveNameInput(nameInput)
   }
 
-  const validateBranch = useCallback((name: string) => {
-    if (!name) {
-      setBranchError('Branch name is required')
-      setBranchValidating(false)
-      return
-    }
-    setBranchValidating(true)
-    setBranchError(null)
-    if (branchDebounceRef.current) clearTimeout(branchDebounceRef.current)
-    branchDebounceRef.current = setTimeout(async () => {
-      const api = window.agentForge
-      if (!api) {
-        setBranchError('App API not available')
-        setBranchValidating(false)
-        return
-      }
-      try {
-        const result = await api.validateBranchName({ branchName: name })
-        setBranchError(result.valid ? null : (result.message ?? 'Invalid branch name'))
-      } catch {
-        setBranchError('Failed to validate branch name')
-      } finally {
-        setBranchValidating(false)
-      }
-    }, 350)
-  }, [])
-
   function handleBranchChange(value: string) {
     setBranchName(value)
     setBranchAutoFilled(false)
@@ -94,8 +111,12 @@ export function AgentSetupCard({ draftId }: Props) {
   }
 
   function handleBranchBlur() {
-    if (branchDebounceRef.current) clearTimeout(branchDebounceRef.current)
-    validateBranch(branchName)
+    // Flush pending debounce immediately; skip if validation already completed
+    if (branchDebounceRef.current) {
+      clearTimeout(branchDebounceRef.current)
+      branchDebounceRef.current = null
+      validateBranchNow(branchName)
+    }
   }
 
   useEffect(() => {
@@ -105,11 +126,29 @@ export function AgentSetupCard({ draftId }: Props) {
   }, [])
 
   const nameValid = !!resolvedName && !nameError
-  const branchValid = !!branchName && !branchError && !branchValidating
-  const canInitialize = nameValid && branchValid && !submitting
+  const canInitialize = nameValid && !!branchName && !branchError && !submitting
 
   async function handleInitialize() {
-    if (!canInitialize) return
+    if (submitting) return
+
+    if (!resolvedName || nameError) {
+      setSubmitError(nameError || 'Name is required')
+      return
+    }
+    if (!branchName) {
+      setSubmitError('Branch name is required')
+      return
+    }
+
+    // Flush any pending debounce and validate immediately
+    if (branchDebounceRef.current) {
+      clearTimeout(branchDebounceRef.current)
+      branchDebounceRef.current = null
+    }
+    // Always run a fresh validation before submitting to avoid stale state
+    const branchOk = await validateBranchNow(branchName)
+    if (!branchOk) return
+
     const api = window.agentForge
     if (!api) {
       setSubmitError('App API not available')

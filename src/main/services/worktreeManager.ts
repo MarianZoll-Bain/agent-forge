@@ -5,6 +5,7 @@
 
 import * as fs from 'node:fs'
 import * as path from 'node:path'
+import { isPermissionError, getPermissionGuidance } from './permissionCheck'
 
 const WORKTREES_DIR = '.worktrees'
 
@@ -32,6 +33,14 @@ export function ensureWorktreesDirectory(repoPath: string): EnsureWorktreesRespo
     fs.mkdirSync(worktreesRootPath, { recursive: true })
     return { ok: true, worktreesRootPath }
   } catch (e) {
+    if (isPermissionError(e)) {
+      const guidance = getPermissionGuidance(worktreesRootPath)
+      return {
+        ok: false,
+        code: 'PERMISSION_DENIED',
+        message: guidance ?? 'Permission denied when creating worktrees directory. Check your macOS Privacy & Security settings.',
+      }
+    }
     const message = e instanceof Error ? e.message : String(e)
     return {
       ok: false,

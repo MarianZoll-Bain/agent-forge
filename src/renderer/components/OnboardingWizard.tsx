@@ -5,6 +5,7 @@
 import { useState } from 'react'
 import { ToolToggle } from './ToolToggle'
 import { useAppStore } from '../store/useAppStore'
+import { PermissionAlert } from './PermissionAlert'
 
 interface OnboardingWizardProps {
   onComplete: (settings: {
@@ -23,6 +24,8 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
   const [enableGitMode, setEnableGitMode] = useState(false)
   const [repoSelected, setRepoSelected] = useState(false)
   const [selectingRepo, setSelectingRepo] = useState(false)
+  const [repoError, setRepoError] = useState<string | null>(null)
+  const [repoErrorCode, setRepoErrorCode] = useState<string | null>(null)
   const refreshState = useAppStore((s) => s.refreshState)
   const repoName = useAppStore((s) => s.repoName())
 
@@ -30,12 +33,20 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
     const api = window.agentForge
     if (!api) return
     setSelectingRepo(true)
+    setRepoError(null)
+    setRepoErrorCode(null)
     try {
       const result = await api.selectRepository()
       if (result.ok) {
         await refreshState()
         setRepoSelected(true)
+      } else if (result.code !== 'CANCELED') {
+        setRepoErrorCode(result.code ?? null)
+        setRepoError(result.message)
       }
+    } catch (e) {
+      const err = e instanceof Error ? e.message : String(e)
+      setRepoError(err)
     } finally {
       setSelectingRepo(false)
     }
@@ -134,6 +145,16 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                 >
                   {selectingRepo ? 'Opening...' : 'Select Repository'}
                 </button>
+              )}
+              {repoError && repoErrorCode === 'PERMISSION_DENIED' && (
+                <div className="w-full">
+                  <PermissionAlert message={repoError} />
+                </div>
+              )}
+              {repoError && repoErrorCode !== 'PERMISSION_DENIED' && (
+                <div className="w-full p-3 rounded-xl bg-red-50 dark:bg-red-500/10 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-500/20 text-sm">
+                  {repoError}
+                </div>
               )}
             </div>
             <div className="flex gap-2 justify-end pt-2">

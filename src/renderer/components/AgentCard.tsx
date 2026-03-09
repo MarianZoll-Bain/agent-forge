@@ -2,13 +2,31 @@
  * Agent Card: worktree info, git status, open buttons, remove.
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import type { Agent } from '@shared/types'
 import { useAppStore } from '../store/useAppStore'
 
 interface AgentCardProps {
   agent: Agent
   onRemove: (agentId: string) => void
+}
+
+/** Format an ISO date string as a human-readable relative time (e.g. "3 days ago"). */
+function timeAgo(iso: string): string {
+  const ms = Date.now() - new Date(iso).getTime()
+  if (ms < 0) return 'just now'
+  const secs = Math.floor(ms / 1_000)
+  if (secs < 60) return 'just now'
+  const mins = Math.floor(secs / 60)
+  if (mins < 60) return `${mins}m ago`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return `${hrs}h ago`
+  const days = Math.floor(hrs / 24)
+  if (days < 30) return `${days}d ago`
+  const months = Math.floor(days / 30)
+  if (months < 12) return `${months}mo ago`
+  const years = Math.floor(days / 365)
+  return `${years}y ago`
 }
 
 // ---- Copy button ----
@@ -57,14 +75,22 @@ function GitStatusBadge({
   branch,
   lastCommitSha,
   aheadBehind,
+  refreshing,
 }: {
   dirty: boolean
   branch: string
   lastCommitSha: string
   aheadBehind?: { ahead: number; behind: number }
+  refreshing?: boolean
 }) {
   return (
     <div className="flex items-center gap-2 flex-wrap text-xs">
+      {refreshing && (
+        <svg className="w-3 h-3 animate-spin text-indigo-500" fill="none" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+        </svg>
+      )}
       <span className="font-mono font-medium text-slate-600 dark:text-slate-400">{branch}</span>
       {lastCommitSha && (
         <span className="font-mono text-slate-400 dark:text-slate-600">{lastCommitSha}</span>
@@ -195,6 +221,7 @@ export function AgentCard({ agent, onRemove }: AgentCardProps) {
   const settings = useAppStore((s) => s.state?.settings)
   const enableGitMode = useAppStore((s) => s.state?.settings.enableGitMode)
   const prStatus = useAppStore((s) => s.agentPRStatuses[agent.id])
+  const bulkRefreshing = useAppStore((s) => s.agentRefreshingIds.has(agent.id))
   const { refreshState, setAgentGitStatus, setAgentPRStatus, addToast } = useAppStore()
 
   const [prLoading, setPRLoading] = useState(false)
@@ -328,7 +355,27 @@ export function AgentCard({ agent, onRemove }: AgentCardProps) {
             branch={gitStatus.branch}
             lastCommitSha={gitStatus.lastCommitSha}
             aheadBehind={gitStatus.aheadBehind}
+            refreshing={bulkRefreshing}
           />
+        </div>
+      )}
+
+      {/* Timestamps */}
+      {(gitStatus?.lastCommitDate || agent.createdAt) && (
+        <div className="flex items-center gap-3 px-4 pb-3 text-[11px] text-slate-400 dark:text-slate-500">
+          {gitStatus?.lastCommitDate && (
+            <span title={`Last commit: ${new Date(gitStatus.lastCommitDate).toLocaleString()}`}>
+              Last commit {timeAgo(gitStatus.lastCommitDate)}
+            </span>
+          )}
+          {gitStatus?.lastCommitDate && agent.createdAt && (
+            <span className="text-slate-300 dark:text-slate-700">|</span>
+          )}
+          {agent.createdAt && (
+            <span title={`Created: ${new Date(agent.createdAt).toLocaleString()}`}>
+              Created {timeAgo(agent.createdAt)}
+            </span>
+          )}
         </div>
       )}
 
@@ -368,12 +415,12 @@ export function AgentCard({ agent, onRemove }: AgentCardProps) {
             <button
               type="button"
               onClick={fetchPRStatus}
-              disabled={prLoading}
+              disabled={prLoading || bulkRefreshing}
               title="Refresh PR status"
               aria-label="Refresh PR status"
               className="p-1 rounded-md text-slate-400 dark:text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 transition-colors disabled:opacity-40"
             >
-              <svg className={`w-3.5 h-3.5 ${prLoading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className={`w-3.5 h-3.5 ${prLoading || bulkRefreshing ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
               </svg>
             </button>
