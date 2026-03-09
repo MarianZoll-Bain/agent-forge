@@ -24,6 +24,8 @@ let currentStatus: UpdateStatus = {
   releaseNotes: null,
   releaseUrl: null,
   downloaded: false,
+  downloading: false,
+  downloadProgress: 0,
   checking: false,
   error: null,
 }
@@ -58,16 +60,20 @@ export function checkForUpdates(): void {
 
 export function downloadUpdate(): void {
   if (!app.isPackaged) return
+  updateStatus({ downloading: true, downloadProgress: 0, error: null })
   autoUpdater.downloadUpdate().catch((err: unknown) => {
     const message = err instanceof Error ? err.message : 'Download failed'
     logger.warn('autoUpdater downloadUpdate error:', message)
-    updateStatus({ error: message })
+    updateStatus({ downloading: false, downloadProgress: 0, error: message })
   })
 }
 
 export function installUpdate(): void {
   if (!app.isPackaged) return
-  autoUpdater.quitAndInstall(false, true)
+  // Defer quitAndInstall slightly so the IPC response can reach the renderer
+  setTimeout(() => {
+    autoUpdater.quitAndInstall(false, true)
+  }, 300)
 }
 
 function extractReleaseNotes(info: UpdateInfo): string | null {
@@ -112,18 +118,18 @@ export function initAutoUpdater(mainWindow: BrowserWindow): void {
     updateStatus({ checking: false })
   })
 
-  autoUpdater.on('download-progress', () => {
-    // Could push progress %, but keeping it simple for now
+  autoUpdater.on('download-progress', (progress) => {
+    updateStatus({ downloading: true, downloadProgress: Math.round(progress.percent) })
   })
 
   autoUpdater.on('update-downloaded', () => {
     logger.info('autoUpdater: update downloaded')
-    updateStatus({ downloaded: true })
+    updateStatus({ downloaded: true, downloading: false, downloadProgress: 100 })
   })
 
   autoUpdater.on('error', (err: Error) => {
     logger.warn('autoUpdater error:', err.message)
-    updateStatus({ checking: false, error: err.message })
+    updateStatus({ checking: false, downloading: false, downloadProgress: 0, error: err.message })
   })
 
   // Delayed first check

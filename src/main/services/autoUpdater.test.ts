@@ -52,6 +52,8 @@ describe('autoUpdater', () => {
       releaseNotes: null,
       releaseUrl: null,
       downloaded: false,
+      downloading: false,
+      downloadProgress: 0,
       checking: false,
       error: null,
     })

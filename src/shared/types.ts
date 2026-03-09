@@ -61,6 +61,10 @@ export interface UpdateStatus {
   releaseUrl: string | null
   /** Whether the update has been downloaded and is ready to install */
   downloaded: boolean
+  /** Whether a download is currently in progress */
+  downloading: boolean
+  /** Download progress percentage (0–100) */
+  downloadProgress: number
   /** Whether a check is currently in progress */
   checking: boolean
   /** Error message from last check/download attempt */

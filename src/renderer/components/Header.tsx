@@ -32,7 +32,7 @@ export function Header() {
           </div>
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
-          {updateStatus?.available && <UpdateBadge status={updateStatus} />}
+          {(updateStatus?.available || updateStatus?.downloading || updateStatus?.downloaded) && <UpdateBadge status={updateStatus} />}
           <HeaderButton
             onClick={() => setPromptsOpen(true)}
             label="Prompts"
@@ -84,7 +84,7 @@ function UpdateBadge({ status }: { status: import('@shared/types').UpdateStatus 
   function handleClick() {
     if (status.downloaded) {
       api?.installUpdate()
-    } else {
+    } else if (!status.downloading) {
       api?.downloadUpdate()
     }
   }
@@ -96,6 +96,62 @@ function UpdateBadge({ status }: { status: import('@shared/types').UpdateStatus 
     }
   }
 
+  // Downloading state — show progress bar
+  if (status.downloading) {
+    return (
+      <div className="flex items-center gap-1">
+        <div className="flex items-center gap-2 px-2.5 py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400">
+          <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+          </svg>
+          <div className="flex items-center gap-1.5">
+            <span>Downloading</span>
+            <div className="w-16 h-1.5 bg-indigo-200 dark:bg-indigo-800 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-indigo-600 dark:bg-indigo-400 rounded-full transition-all duration-300"
+                style={{ width: `${status.downloadProgress}%` }}
+              />
+            </div>
+            <span className="tabular-nums w-7 text-right">{status.downloadProgress}%</span>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Downloaded — show restart button
+  if (status.downloaded) {
+    return (
+      <div className="flex items-center gap-1">
+        <button
+          type="button"
+          onClick={handleClick}
+          className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/50 transition-colors"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          Restart to update
+        </button>
+        {status.releaseUrl && (
+          <button
+            type="button"
+            onClick={handleOpenRelease}
+            className="p-1 rounded text-green-600 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300 transition-colors"
+            title="View release notes"
+            aria-label="View release notes"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+            </svg>
+          </button>
+        )}
+      </div>
+    )
+  }
+
+  // Available — show download button
   return (
     <div className="flex items-center gap-1">
       <button
@@ -106,9 +162,7 @@ function UpdateBadge({ status }: { status: import('@shared/types').UpdateStatus 
         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
         </svg>
-        {status.downloaded
-          ? 'Restart to update'
-          : `v${status.latestVersion} available`}
+        v{status.latestVersion} available
       </button>
       {status.releaseUrl && (
         <button
