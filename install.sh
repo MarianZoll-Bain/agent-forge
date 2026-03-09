@@ -29,7 +29,12 @@ info "Latest version: $VERSION"
 
 case "$OS" in
   Darwin)
-    ARTIFACT="AgentForge-${VERSION}-${ARCH}.dmg"
+    # electron-builder names x64 DMG without arch suffix, arm64 gets "-arm64"
+    if [ "$ARCH" = "arm64" ]; then
+      ARTIFACT="AgentForge-${VERSION}-arm64.dmg"
+    else
+      ARTIFACT="AgentForge-${VERSION}.dmg"
+    fi
     URL="https://github.com/${REPO}/releases/download/${TAG}/${ARTIFACT}"
     TMPFILE="$(mktemp /tmp/agentforge-XXXXXX.dmg)"
 
@@ -52,7 +57,7 @@ case "$OS" in
 
   Linux)
     if command -v dpkg >/dev/null 2>&1; then
-      ARTIFACT="AgentForge-${VERSION}-amd64.deb"
+      ARTIFACT="agent-forge_${VERSION}_amd64.deb"
       URL="https://github.com/${REPO}/releases/download/${TAG}/${ARTIFACT}"
       TMPFILE="$(mktemp /tmp/agentforge-XXXXXX.deb)"
 
@@ -66,7 +71,7 @@ case "$OS" in
       ok "AgentForge installed via dpkg"
       info "Run: agentforge"
     else
-      ARTIFACT="AgentForge-${VERSION}-x86_64.AppImage"
+      ARTIFACT="AgentForge-${VERSION}.AppImage"
       URL="https://github.com/${REPO}/releases/download/${TAG}/${ARTIFACT}"
       DEST="${HOME}/.local/bin/AgentForge.AppImage"
 
