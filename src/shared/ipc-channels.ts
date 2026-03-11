@@ -67,6 +67,9 @@ export const AGENT_CREATE = 'agent:create' as const
 /** Open an external tool in the agent's worktree */
 export const AGENT_OPEN = 'agent:open' as const
 
+/** Open an external tool in the root repo directory */
+export const REPO_OPEN = 'repo:open' as const
+
 /** Update app settings */
 export const SETTINGS_UPDATE = 'settings:update' as const
 
@@ -103,6 +106,12 @@ export interface AgentOpenPayload {
   agentId: string
   tool: 'cursor' | 'claude' | 'claude-ollama'
 }
+
+export interface RepoOpenPayload {
+  tool: 'cursor' | 'claude' | 'claude-ollama'
+}
+
+export type RepoOpenResponse = AgentOpenResult | AgentOpenError
 
 export interface AgentOpenResult {
   ok: true
@@ -356,6 +365,7 @@ export type PreloadAPI = {
   createAgent: (payload: AgentCreatePayload) => Promise<AgentCreateResponse>
   updateSettings: (payload: SettingsUpdatePayload) => Promise<SettingsUpdateResponse>
   openAgent: (payload: AgentOpenPayload) => Promise<AgentOpenResponse>
+  openRepo: (payload: RepoOpenPayload) => Promise<RepoOpenResponse>
   getAgentGitStatus: (payload: AgentGitStatusPayload) => Promise<AgentGitStatusResponse>
   removeAgent: (payload: AgentRemovePayload) => Promise<AgentRemoveResponse>
   listPrompts: () => Promise<PromptsListResponse>

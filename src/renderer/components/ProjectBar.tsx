@@ -5,13 +5,29 @@
 import { useState } from 'react'
 import { useAppStore } from '../store/useAppStore'
 
+type Tool = 'cursor' | 'claude' | 'claude-ollama'
+
+const TOOL_BUTTON_STYLES: Record<Tool, string> = {
+  cursor: 'bg-violet-100 hover:bg-violet-200 text-violet-700 dark:bg-violet-500/15 dark:hover:bg-violet-500/25 dark:text-violet-300 border border-violet-200/80 dark:border-violet-500/20',
+  claude: 'bg-orange-100 hover:bg-orange-200 text-orange-700 dark:bg-orange-500/15 dark:hover:bg-orange-500/25 dark:text-orange-300 border border-orange-200/80 dark:border-orange-500/20',
+  'claude-ollama': 'bg-amber-100 hover:bg-amber-200 text-amber-700 dark:bg-amber-500/15 dark:hover:bg-amber-500/25 dark:text-amber-300 border border-amber-200/80 dark:border-amber-500/20',
+}
+
+const TOOL_LABELS: Record<Tool, string> = {
+  cursor: 'Cursor',
+  claude: 'Claude',
+  'claude-ollama': 'Ollama',
+}
+
 export function ProjectBar() {
   const repoName = useAppStore((s) => s.repoName())
   const refreshState = useAppStore((s) => s.refreshState)
   const pullMain = useAppStore((s) => s.pullMain)
   const pullingMain = useAppStore((s) => s.pullingMain)
   const baseBranch = useAppStore((s) => s.state?.settings.baseBranch || 'main')
+  const settings = useAppStore((s) => s.state?.settings)
   const [switching, setSwitching] = useState(false)
+  const [openBusy, setOpenBusy] = useState<Tool | null>(null)
 
   if (!repoName) return null
 
@@ -29,6 +45,22 @@ export function ProjectBar() {
     }
   }
 
+  async function handleOpenTool(tool: Tool) {
+    const api = window.agentForge
+    if (!api || openBusy) return
+    setOpenBusy(tool)
+    try {
+      await api.openRepo({ tool })
+    } finally {
+      setOpenBusy(null)
+    }
+  }
+
+  const enabledTools: Tool[] = []
+  if (settings?.enableCursor) enabledTools.push('cursor')
+  if (settings?.enableClaude) enabledTools.push('claude')
+  if (settings?.enableClaudeOllama) enabledTools.push('claude-ollama')
+
   return (
     <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-white/80 dark:bg-white/[0.04] border border-slate-200/60 dark:border-white/[0.06] shadow-sm">
       <div className="flex items-center gap-2.5 min-w-0">
@@ -45,6 +77,18 @@ export function ProjectBar() {
         </div>
       </div>
       <div className="ml-auto flex items-center gap-1.5">
+        {enabledTools.map((tool) => (
+          <button
+            key={tool}
+            type="button"
+            onClick={() => handleOpenTool(tool)}
+            disabled={openBusy !== null}
+            title={`Open ${TOOL_LABELS[tool]} in project root`}
+            className={`text-xs font-semibold px-2.5 py-1 rounded-lg transition-colors disabled:opacity-50 ${TOOL_BUTTON_STYLES[tool]}`}
+          >
+            {openBusy === tool ? 'Opening...' : TOOL_LABELS[tool]}
+          </button>
+        ))}
         <button
           type="button"
           onClick={pullMain}

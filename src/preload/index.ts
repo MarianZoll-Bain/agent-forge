@@ -10,6 +10,7 @@ import type {
   AgentValidateBranchPayload,
   AgentCreatePayload,
   AgentOpenPayload,
+  RepoOpenPayload,
   SettingsUpdatePayload,
   AgentGitStatusPayload,
   AgentRemovePayload,
@@ -34,6 +35,8 @@ const api = {
     ipcRenderer.invoke('settings:update', payload),
   openAgent: (payload: AgentOpenPayload) =>
     ipcRenderer.invoke('agent:open', payload),
+  openRepo: (payload: RepoOpenPayload) =>
+    ipcRenderer.invoke('repo:open', payload),
   getAgentGitStatus: (payload: AgentGitStatusPayload) =>
     ipcRenderer.invoke('agent:gitStatus', payload),
   removeAgent: (payload: AgentRemovePayload) =>

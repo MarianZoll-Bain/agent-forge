@@ -29,6 +29,7 @@ import type {
   SettingsUpdateResponse,
   AgentGitStatusResponse,
   AgentOpenResponse,
+  RepoOpenResponse,
   AgentRemoveResponse,
   PromptsListResponse,
   PromptsSaveResponse,
@@ -208,6 +209,10 @@ const AgentOpenSchema = z.object({
   tool: z.enum(['cursor', 'claude', 'claude-ollama']),
 })
 
+const RepoOpenSchema = z.object({
+  tool: z.enum(['cursor', 'claude', 'claude-ollama']),
+})
+
 const SettingsUpdateSchema = z.object({
   settings: z.object({
     baseBranch: z.string().min(1).optional(),
@@ -339,6 +344,34 @@ async function handleAgentOpen(
 
   logger.info(`agent:open agentId=${agentId} tool=${tool}`)
   return openAgent(tool, agent.worktreePath, {
+    ollamaModel: state.settings.ollamaModel,
+    ollamaBaseUrl: state.settings.ollamaBaseUrl,
+  })
+}
+
+async function handleRepoOpen(
+  event: Electron.IpcMainInvokeEvent,
+  payload: unknown,
+): Promise<RepoOpenResponse> {
+  if (!isSenderAllowed(event)) {
+    return { ok: false, code: 'FORBIDDEN', message: 'Invalid sender' }
+  }
+  const parsed = RepoOpenSchema.safeParse(payload)
+  if (!parsed.success) {
+    return { ok: false, code: 'VALIDATION_FAILED', message: 'tool is required' }
+  }
+  const { tool } = parsed.data
+
+  const stateResult = loadState()
+  if (!stateResult.ok) return { ok: false, code: stateResult.code, message: stateResult.message }
+  const state = stateResult.state
+
+  if (!state.repoPath) {
+    return { ok: false, code: 'NO_REPO', message: 'No repository selected' }
+  }
+
+  logger.info(`repo:open tool=${tool} path=${state.repoPath}`)
+  return openAgent(tool, state.repoPath, {
     ollamaModel: state.settings.ollamaModel,
     ollamaBaseUrl: state.settings.ollamaBaseUrl,
   })
@@ -578,6 +611,10 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('agent:open', (event, payload: unknown) => {
     return handleAgentOpen(event, payload)
+  })
+
+  ipcMain.handle('repo:open', (event, payload: unknown) => {
+    return handleRepoOpen(event, payload)
   })
 
   ipcMain.handle('settings:update', (event, payload: unknown) => {
