@@ -64,6 +64,15 @@ case "$OS" in
     hdiutil detach "$MOUNT_DIR" -quiet
     rm -f "$TMPFILE"
 
+    # Re-sign with ad-hoc signature so all binaries share the same Team ID
+    info "Signing app bundle..."
+    codesign --force --deep --sign - /Applications/AgentForge.app 2>/dev/null || \
+      sudo codesign --force --deep --sign - /Applications/AgentForge.app
+
+    # Remove quarantine attribute so Gatekeeper doesn't block launch
+    xattr -cr /Applications/AgentForge.app 2>/dev/null || \
+      sudo xattr -cr /Applications/AgentForge.app
+
     ok "AgentForge installed to /Applications/AgentForge.app"
     info "Run: open /Applications/AgentForge.app"
     ;;
