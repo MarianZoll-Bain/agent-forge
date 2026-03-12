@@ -87,6 +87,8 @@ export interface AgentCreatePayload {
   branchName: string
   /** Default: "main" */
   baseBranch: string
+  /** Copy .env from repo root into the new worktree. Default: true. */
+  copyEnv?: boolean
 }
 
 export interface AgentCreateResult {

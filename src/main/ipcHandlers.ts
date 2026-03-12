@@ -210,6 +210,7 @@ const AgentCreateSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   branchName: z.string().min(1),
   baseBranch: z.string().min(1),
+  copyEnv: z.boolean().optional(),
 })
 
 const AgentOpenSchema = z.object({
@@ -236,7 +237,6 @@ const SettingsUpdateSchema = z.object({
     enableClaudeOllama: z.boolean().optional(),
     onboardingComplete: z.boolean().optional(),
     enableGitMode: z.boolean().optional(),
-    copyEnvToWorktree: z.boolean().optional(),
   }),
 })
 
@@ -294,7 +294,7 @@ async function handleAgentCreate(
     const msg = parsed.error.issues.map((i) => i.message).join('; ')
     return { ok: false, code: 'VALIDATION_FAILED', message: msg }
   }
-  const { name, branchName, baseBranch } = parsed.data
+  const { name, branchName, baseBranch, copyEnv } = parsed.data
 
   const stateResult = loadState()
   if (!stateResult.ok) {
@@ -312,7 +312,7 @@ async function handleAgentCreate(
     baseBranch,
     worktreesRootPath: state.worktreesRootPath,
     repoPath: state.repoPath,
-    copyEnvToWorktree: state.settings.copyEnvToWorktree ?? true,
+    copyEnvToWorktree: copyEnv ?? true,
   })
   if (!result.ok) {
     logger.warn('agent:create failed:', result.code, result.message)

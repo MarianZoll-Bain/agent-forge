@@ -30,7 +30,6 @@ export function SettingsPanel({ onClose, onOpenOnboarding }: SettingsPanelProps)
   const [enableClaude, setEnableClaude] = useState(state?.settings.enableClaude ?? false)
   const [enableClaudeOllama, setEnableClaudeOllama] = useState(state?.settings.enableClaudeOllama ?? false)
   const [enableGitMode, setEnableGitMode] = useState(state?.settings.enableGitMode ?? false)
-  const [copyEnvToWorktree, setCopyEnvToWorktree] = useState(state?.settings.copyEnvToWorktree ?? true)
   const [validationError, setValidationError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
@@ -47,7 +46,6 @@ export function SettingsPanel({ onClose, onOpenOnboarding }: SettingsPanelProps)
     setEnableClaude(state?.settings.enableClaude ?? false)
     setEnableClaudeOllama(state?.settings.enableClaudeOllama ?? false)
     setEnableGitMode(state?.settings.enableGitMode ?? false)
-    setCopyEnvToWorktree(state?.settings.copyEnvToWorktree ?? true)
   }, [state?.settings])
 
   async function handleSave() {
@@ -77,7 +75,6 @@ export function SettingsPanel({ onClose, onOpenOnboarding }: SettingsPanelProps)
         enableClaude,
         enableClaudeOllama,
         enableGitMode,
-        copyEnvToWorktree,
       }
       const result = await api.updateSettings({ settings: updatedSettings })
       if (!result.ok) {
@@ -226,18 +223,6 @@ export function SettingsPanel({ onClose, onOpenOnboarding }: SettingsPanelProps)
                 </label>
                 <input id="worktrees-dir" type="text" value={worktreesDirName} onChange={(e) => setWorktreesDirName(e.target.value)} placeholder=".worktrees" autoComplete="off" spellCheck={false} className={inputClass} />
               </div>
-              {state?.hasRootEnvFile && (
-                <label className="flex items-center gap-2.5 cursor-pointer" htmlFor="copy-env">
-                  <input
-                    id="copy-env"
-                    type="checkbox"
-                    checked={copyEnvToWorktree}
-                    onChange={(e) => setCopyEnvToWorktree(e.target.checked)}
-                    className="rounded border-slate-300 dark:border-white/20 text-indigo-500 focus:ring-indigo-500/30"
-                  />
-                  <span className="text-xs font-medium text-slate-600 dark:text-slate-400">Copy .env to new worktrees</span>
-                </label>
-              )}
             </div>
           </section>
 

@@ -44,8 +44,6 @@ export interface Settings {
   onboardingComplete?: boolean
   /** Enable GitHub CLI integration (PR detection on agent cards). */
   enableGitMode?: boolean
-  /** Copy .env file from repo root into new worktrees. Default: true. */
-  copyEnvToWorktree?: boolean
 }
 
 export const CURRENT_STATE_VERSION = 3

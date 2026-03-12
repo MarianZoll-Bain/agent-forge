@@ -17,6 +17,7 @@ function suggestBranch(name: string): string {
 
 export function AgentSetupCard({ draftId }: Props) {
   const { removeDraftAgent, refreshState } = useAppStore()
+  const hasRootEnvFile = useAppStore((s) => s.state?.hasRootEnvFile ?? false)
 
   const [nameInput, setNameInput] = useState('')
   const [resolvedName, setResolvedName] = useState('')
@@ -27,6 +28,7 @@ export function AgentSetupCard({ draftId }: Props) {
   const [branchValidating, setBranchValidating] = useState(false)
   const [branchAutoFilled, setBranchAutoFilled] = useState(false)
 
+  const [copyEnv, setCopyEnv] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
 
@@ -161,6 +163,7 @@ export function AgentSetupCard({ draftId }: Props) {
         name: resolvedName,
         branchName,
         baseBranch: baseBranch || 'main',
+        copyEnv: hasRootEnvFile ? copyEnv : undefined,
       })
       if (!result.ok) {
         setSubmitError(result.message)
@@ -245,6 +248,20 @@ export function AgentSetupCard({ draftId }: Props) {
           className={`${inputBase} border-slate-300 dark:border-white/[0.08]`}
         />
       </div>
+
+      {/* Copy .env option — only when repo has a .env */}
+      {hasRootEnvFile && (
+        <label className="flex items-center gap-2 cursor-pointer pt-1" htmlFor={`copy-env-${draftId}`}>
+          <input
+            id={`copy-env-${draftId}`}
+            type="checkbox"
+            checked={copyEnv}
+            onChange={(e) => setCopyEnv(e.target.checked)}
+            className="rounded border-slate-300 dark:border-white/20 text-indigo-500 focus:ring-indigo-500/30"
+          />
+          <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Copy .env to worktree</span>
+        </label>
+      )}
 
       {/* Submit error */}
       {submitError && (
