@@ -12,6 +12,8 @@ export interface AppState {
   agents: Agent[]
   settings: Settings
   lastUpdated?: string
+  /** Whether the currently selected repo has a .env file at its root. */
+  hasRootEnvFile?: boolean
 }
 
 export interface Agent {
@@ -42,6 +44,8 @@ export interface Settings {
   onboardingComplete?: boolean
   /** Enable GitHub CLI integration (PR detection on agent cards). */
   enableGitMode?: boolean
+  /** Copy .env file from repo root into new worktrees. Default: true. */
+  copyEnvToWorktree?: boolean
 }
 
 export const CURRENT_STATE_VERSION = 3

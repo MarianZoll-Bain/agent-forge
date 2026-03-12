@@ -51,6 +51,8 @@ export function getUpdateStatus(): UpdateStatus {
 
 export function checkForUpdates(): void {
   if (!app.isPackaged) return
+  // Don't check while a download is in progress or already completed
+  if (currentStatus.downloading || currentStatus.downloaded) return
   autoUpdater.checkForUpdates().catch((err: unknown) => {
     const message = err instanceof Error ? err.message : 'Check failed'
     logger.warn('autoUpdater checkForUpdates error:', message)
@@ -60,6 +62,8 @@ export function checkForUpdates(): void {
 
 export function downloadUpdate(): void {
   if (!app.isPackaged) return
+  // Don't start a download if one is already in progress or completed
+  if (currentStatus.downloading || currentStatus.downloaded) return
   updateStatus({ downloading: true, downloadProgress: 0, error: null })
   autoUpdater.downloadUpdate().catch((err: unknown) => {
     const message = err instanceof Error ? err.message : 'Download failed'
@@ -70,6 +74,8 @@ export function downloadUpdate(): void {
 
 export function installUpdate(): void {
   if (!app.isPackaged) return
+  // Stop periodic checks so they don't interfere with quit
+  stopAutoUpdater()
   // Defer quitAndInstall slightly so the IPC response can reach the renderer
   setTimeout(() => {
     autoUpdater.quitAndInstall(false, true)

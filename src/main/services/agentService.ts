@@ -108,6 +108,8 @@ export interface CreateAgentParams {
   baseBranch: string
   worktreesRootPath: string
   repoPath: string
+  /** Copy .env from repo root to the new worktree. Default: true. */
+  copyEnvToWorktree?: boolean
 }
 
 export interface CreateAgentResult {
@@ -189,6 +191,19 @@ export async function createWorktreeForAgent(params: CreateAgentParams): Promise
     finalWorktreePath = defaultWorktreePath
     const result = await doCreateGitWorktree(repoPath, finalWorktreePath, branchName, baseBranch)
     if (!result.ok) return result
+  }
+
+  // Copy .env from repo root to the new worktree if enabled
+  if (params.copyEnvToWorktree !== false) {
+    const envSource = path.join(repoPath, '.env')
+    const envDest = path.join(finalWorktreePath, '.env')
+    try {
+      if (fs.existsSync(envSource)) {
+        fs.copyFileSync(envSource, envDest)
+      }
+    } catch {
+      // Non-fatal: warn but don't fail worktree creation
+    }
   }
 
   const agent: Agent = {

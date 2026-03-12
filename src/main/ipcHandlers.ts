@@ -3,6 +3,8 @@
  * Simplified: worktree management + native opener. No embedded agent execution.
  */
 
+import * as fs from 'node:fs'
+import * as path from 'node:path'
 import { ipcMain, shell } from 'electron'
 import type { BrowserWindow } from 'electron'
 import { z } from 'zod'
@@ -116,6 +118,8 @@ async function handleSelectRepository(event: Electron.IpcMainInvokeEvent): Promi
     logger.warn('Worktree discovery failed (non-fatal):', e instanceof Error ? e.message : e)
   }
 
+  const hasRootEnvFile = fs.existsSync(path.join(repoPath, '.env'))
+
   const newState: AppState = {
     ...currentState,
     repoPath,
@@ -123,6 +127,7 @@ async function handleSelectRepository(event: Electron.IpcMainInvokeEvent): Promi
     agentsMdPath,
     agentsMdContents,
     agents: [...existingAgents, ...discoveredAgents],
+    hasRootEnvFile,
   }
   const saveResult = saveState(newState)
   if (!saveResult.ok) {
@@ -151,13 +156,16 @@ async function handleGetState(event: Electron.IpcMainInvokeEvent): Promise<State
   const state = result.state
   const warning = result.warning
 
+  // Detect .env at repo root
+  const hasRootEnvFile = state.repoPath ? fs.existsSync(path.join(state.repoPath, '.env')) : false
+
   // Discover any new worktrees that appeared on disk since last save
   if (state.repoPath && state.worktreesRootPath) {
     try {
       const discovered = await discoverExistingWorktrees(state.repoPath, state.worktreesRootPath, state.agents)
       if (discovered.length > 0) {
         logger.info(`Discovered ${discovered.length} new worktree(s) on startup`)
-        const updated: AppState = { ...state, agents: [...state.agents, ...discovered] }
+        const updated: AppState = { ...state, agents: [...state.agents, ...discovered], hasRootEnvFile }
         saveState(updated)
         return { state: updated, warning }
       }
@@ -166,7 +174,7 @@ async function handleGetState(event: Electron.IpcMainInvokeEvent): Promise<State
     }
   }
 
-  return { state, warning }
+  return { state: { ...state, hasRootEnvFile }, warning }
 }
 
 async function handleRepoPull(
@@ -228,6 +236,7 @@ const SettingsUpdateSchema = z.object({
     enableClaudeOllama: z.boolean().optional(),
     onboardingComplete: z.boolean().optional(),
     enableGitMode: z.boolean().optional(),
+    copyEnvToWorktree: z.boolean().optional(),
   }),
 })
 
@@ -303,6 +312,7 @@ async function handleAgentCreate(
     baseBranch,
     worktreesRootPath: state.worktreesRootPath,
     repoPath: state.repoPath,
+    copyEnvToWorktree: state.settings.copyEnvToWorktree ?? true,
   })
   if (!result.ok) {
     logger.warn('agent:create failed:', result.code, result.message)

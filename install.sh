@@ -22,8 +22,14 @@ esac
 
 # Fetch latest release tag
 info "Fetching latest release..."
-TAG="$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" | grep '"tag_name"' | head -1 | sed 's/.*"tag_name": *"\([^"]*\)".*/\1/')"
-[ -z "$TAG" ] && err "Could not determine latest release tag"
+RELEASE_JSON="$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest")" \
+  || err "Could not fetch release info from GitHub"
+if command -v jq >/dev/null 2>&1; then
+  TAG="$(printf '%s' "$RELEASE_JSON" | jq -r '.tag_name')"
+else
+  TAG="$(printf '%s' "$RELEASE_JSON" | grep '"tag_name"' | head -1 | sed 's/.*"tag_name": *"\([^"]*\)".*/\1/')"
+fi
+[ -z "$TAG" ] || [ "$TAG" = "null" ] && err "Could not determine latest release tag"
 VERSION="${TAG#v}"
 info "Latest version: $VERSION"
 
@@ -43,6 +49,13 @@ case "$OS" in
 
     info "Mounting DMG..."
     MOUNT_DIR="$(hdiutil attach "$TMPFILE" -nobrowse -noverify | tail -1 | awk -F'\t' '{print $NF}')"
+
+    # Remove old version if present so cp -R replaces cleanly
+    if [ -d "/Applications/AgentForge.app" ]; then
+      info "Removing previous version..."
+      rm -rf /Applications/AgentForge.app 2>/dev/null || \
+        sudo rm -rf /Applications/AgentForge.app
+    fi
 
     info "Copying AgentForge.app to /Applications..."
     cp -R "${MOUNT_DIR}/AgentForge.app" /Applications/ 2>/dev/null || \
