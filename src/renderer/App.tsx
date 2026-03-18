@@ -2,7 +2,7 @@
  * Root app: loads state on mount, shows onboarding, select repository, or main layout.
  */
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { SelectRepository } from './components/SelectRepository'
 import { MainLayout } from './components/MainLayout'
 import { OnboardingWizard } from './components/OnboardingWizard'
@@ -16,6 +16,14 @@ export default function App() {
   const state = useAppStore((s) => s.state)
   const permissionWarning = useAppStore((s) => s.permissionWarning)
   const [initialized, setInitialized] = useState(false)
+
+  // Stable ref for addToast so the updater effect doesn't re-register on every render
+  const addToastRef = useRef(addToast)
+  addToastRef.current = addToast
+
+  // Track which update toasts have already been shown to prevent duplicates
+  const shownUpdateToastRef = useRef<string | null>(null)
+  const shownDownloadToastRef = useRef(false)
 
   useEffect(() => {
     const api = window.agentForge
@@ -46,16 +54,19 @@ export default function App() {
     api.getUpdateStatus().then((status) => setUpdateStatus(status)).catch(() => {})
     const unsubscribe = api.onUpdateStatus((status) => {
       setUpdateStatus(status)
-      if (status.available && !status.downloaded) {
-        addToast(`Update v${status.latestVersion} available`, 'info')
+      if (status.available && !status.downloaded && status.latestVersion && shownUpdateToastRef.current !== status.latestVersion) {
+        shownUpdateToastRef.current = status.latestVersion
+        addToastRef.current(`Update v${status.latestVersion} available`, 'info')
       }
-      if (status.downloaded) {
-        addToast('Update downloaded — restart to apply', 'success')
+      if (status.downloaded && !shownDownloadToastRef.current) {
+        shownDownloadToastRef.current = true
+        addToastRef.current('Update downloaded — restart to apply', 'success')
       }
     })
 
     return unsubscribe
-  }, [setState, setLoadError, setPermissionWarning, setAppVersion, setUpdateStatus, addToast, applyTheme])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   async function handleOnboardingComplete(settings: {
     enableCursor: boolean

@@ -12,6 +12,7 @@ export type AgentTool = 'cursor' | 'claude' | 'claude-ollama'
 export interface OpenAgentOptions {
   ollamaModel?: string
   ollamaBaseUrl?: string
+  agentName?: string
 }
 
 /** Wrap a path in single quotes, escaping any embedded single quotes. */
@@ -23,16 +24,21 @@ function shellSingleQuote(p: string): string {
  * Open a new Terminal.app tab/window running `shellCmd`.
  * Returns true on success, false if osascript is not available or fails.
  */
-async function openTerminalRunning(shellCmd: string): Promise<boolean> {
+async function openTerminalRunning(shellCmd: string, windowTitle?: string): Promise<boolean> {
   try {
     const { execa } = await import('execa')
     const appleCmd = shellCmd.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
-    await execa('osascript', [
-      '-e', 'tell application "Terminal"',
-      '-e', '  activate',
-      '-e', `  do script "${appleCmd}"`,
-      '-e', 'end tell',
-    ])
+    const lines = [
+      'tell application "Terminal"',
+      '  activate',
+      `  set newTab to do script "${appleCmd}"`,
+    ]
+    if (windowTitle) {
+      const safeTitle = windowTitle.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+      lines.push(`  set custom title of window 1 to "${safeTitle}"`)
+    }
+    lines.push('end tell')
+    await execa('osascript', lines.flatMap((l) => ['-e', l]))
     return true
   } catch (e) {
     logger.warn(`openTerminalRunning failed: ${e instanceof Error ? e.message : e}`)
@@ -73,7 +79,8 @@ export async function openAgent(
 
     case 'claude': {
       const cmd = `cd ${shellSingleQuote(worktreePath)} && claude`
-      const success = await openTerminalRunning(cmd)
+      const title = options?.agentName ? `AgentForge: ${options.agentName}` : undefined
+      const success = await openTerminalRunning(cmd, title)
       if (!success) {
         return { ok: false, code: 'TERMINAL_FAILED', message: 'Failed to open Terminal.app with claude' }
       }
@@ -93,7 +100,8 @@ export async function openAgent(
         `claude --model ${shellSingleQuote(model)}`,
       ]
       const cmd = parts.join(' && ')
-      const success = await openTerminalRunning(cmd)
+      const title = options?.agentName ? `AgentForge: ${options.agentName}` : undefined
+      const success = await openTerminalRunning(cmd, title)
       if (!success) {
         return { ok: false, code: 'TERMINAL_FAILED', message: 'Failed to open Terminal.app with claude + Ollama' }
       }

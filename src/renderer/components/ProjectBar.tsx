@@ -28,6 +28,8 @@ export function ProjectBar() {
   const settings = useAppStore((s) => s.state?.settings)
   const [switching, setSwitching] = useState(false)
   const [openBusy, setOpenBusy] = useState<Tool | null>(null)
+  const [tiling, setTiling] = useState(false)
+  const [tileToast, setTileToast] = useState<string | null>(null)
 
   if (!repoName) return null
 
@@ -53,6 +55,25 @@ export function ProjectBar() {
       await api.openRepo({ tool })
     } finally {
       setOpenBusy(null)
+    }
+  }
+
+  async function handleTileTerminals() {
+    const api = window.agentForge
+    if (!api || tiling) return
+    setTiling(true)
+    setTileToast(null)
+    try {
+      const result = await api.tileTerminals()
+      if (result.ok) {
+        const msg = result.tiledCount === 0
+          ? 'No agent terminals found'
+          : `Tiled ${result.tiledCount} terminal${result.tiledCount > 1 ? 's' : ''}`
+        setTileToast(msg)
+        setTimeout(() => setTileToast(null), 3000)
+      }
+    } finally {
+      setTiling(false)
     }
   }
 
@@ -89,6 +110,32 @@ export function ProjectBar() {
             {openBusy === tool ? 'Opening...' : TOOL_LABELS[tool]}
           </button>
         ))}
+        <div className="relative">
+          <button
+            type="button"
+            onClick={handleTileTerminals}
+            disabled={tiling}
+            title="Tile agent Terminal windows side-by-side"
+            className="text-xs font-semibold px-3 py-1 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/[0.06] disabled:opacity-50 transition-colors flex items-center gap-1.5"
+          >
+            {tiling ? (
+              <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+            ) : (
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 4H5a1 1 0 00-1 1v4a1 1 0 001 1h4a1 1 0 001-1V5a1 1 0 00-1-1zm10 0h-4a1 1 0 00-1 1v4a1 1 0 001 1h4a1 1 0 001-1V5a1 1 0 00-1-1zm-10 10H5a1 1 0 00-1 1v4a1 1 0 001 1h4a1 1 0 001-1v-4a1 1 0 00-1-1zm10 0h-4a1 1 0 00-1 1v4a1 1 0 001 1h4a1 1 0 001-1v-4a1 1 0 00-1-1z" />
+              </svg>
+            )}
+            Tile
+          </button>
+          {tileToast && (
+            <div className="absolute top-full mt-1 left-1/2 -translate-x-1/2 whitespace-nowrap text-[10px] font-medium px-2 py-0.5 rounded bg-slate-800 text-white dark:bg-white dark:text-slate-900 shadow-lg z-10">
+              {tileToast}
+            </div>
+          )}
+        </div>
         <button
           type="button"
           onClick={pullMain}

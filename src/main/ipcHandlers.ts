@@ -21,6 +21,7 @@ import * as promptManager from './services/promptManager'
 import { verifyTool } from './services/toolVerifier'
 import { getPRStatus } from './services/prStatusService'
 import { getAppVersion, getUpdateStatus, checkForUpdates, downloadUpdate, installUpdate } from './services/autoUpdater'
+import { tileAgentTerminals } from './services/windowTiler'
 import type {
   RepoSelectResponse,
   RepoSelectResult,
@@ -42,6 +43,7 @@ import type {
   AgentPRStatusResponse,
   GitListBranchesResponse,
   GitListPRsResponse,
+  WindowTileResponse,
 } from '../shared/ipc-channels'
 import type { AppState } from '../shared/types'
 import { defaultState } from './services/stateManager'
@@ -358,6 +360,7 @@ async function handleAgentOpen(
   return openAgent(tool, agent.worktreePath, {
     ollamaModel: state.settings.ollamaModel,
     ollamaBaseUrl: state.settings.ollamaBaseUrl,
+    agentName: agent.name,
   })
 }
 
@@ -386,6 +389,7 @@ async function handleRepoOpen(
   return openAgent(tool, state.repoPath, {
     ollamaModel: state.settings.ollamaModel,
     ollamaBaseUrl: state.settings.ollamaBaseUrl,
+    agentName: path.basename(state.repoPath),
   })
 }
 
@@ -642,6 +646,15 @@ async function handleListPRs(
   }
 }
 
+async function handleWindowTile(
+  event: Electron.IpcMainInvokeEvent,
+): Promise<WindowTileResponse> {
+  if (!isSenderAllowed(event)) {
+    return { ok: false, code: 'FORBIDDEN', message: 'Invalid sender' }
+  }
+  return tileAgentTerminals()
+}
+
 export function registerIpcHandlers(): void {
   ipcMain.handle('repo:select', (event) => {
     return handleSelectRepository(event)
@@ -727,6 +740,10 @@ export function registerIpcHandlers(): void {
     const isSystemSettings = url.startsWith('x-apple.systempreferences:')
     if (!isHttps && !isSystemSettings) return
     return shell.openExternal(url)
+  })
+
+  ipcMain.handle('window:tile', (event) => {
+    return handleWindowTile(event)
   })
 
   // ---- App version + auto-update ----

@@ -61,6 +61,8 @@ const api = {
     ipcRenderer.invoke('agent:prStatus', payload),
   openExternal: (url: string) =>
     ipcRenderer.invoke('shell:openExternal', url),
+  tileTerminals: () =>
+    ipcRenderer.invoke('window:tile'),
   // Auto-update
   getAppVersion: () =>
     ipcRenderer.invoke('app:version'),

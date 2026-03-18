@@ -384,6 +384,24 @@ export interface AgentPRStatusError {
 
 export type AgentPRStatusResponse = AgentPRStatusResult | AgentPRStatusError
 
+// ---- Window management channels ----
+
+/** Tile all AgentForge Terminal windows side-by-side */
+export const WINDOW_TILE = 'window:tile' as const
+
+export interface WindowTileResult {
+  ok: true
+  tiledCount: number
+}
+
+export interface WindowTileError {
+  ok: false
+  code: string
+  message: string
+}
+
+export type WindowTileResponse = WindowTileResult | WindowTileError
+
 // ---- Shell channels ----
 
 /** Open a URL in the user's default browser */
@@ -429,6 +447,7 @@ export type PreloadAPI = {
   resetApp: () => Promise<AppResetResponse>
   getAgentPRStatus: (payload: AgentPRStatusPayload) => Promise<AgentPRStatusResponse>
   openExternal: (url: string) => Promise<void>
+  tileTerminals: () => Promise<WindowTileResponse>
   // Auto-update
   getAppVersion: () => Promise<AppVersionResponse>
   getUpdateStatus: () => Promise<import('./types').UpdateStatus>
