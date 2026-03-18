@@ -49,6 +49,10 @@ const api = {
     ipcRenderer.invoke('prompts:delete', payload),
   changePromptScope: (payload: PromptsChangeScopePayload) =>
     ipcRenderer.invoke('prompts:changeScope', payload),
+  listBranches: () =>
+    ipcRenderer.invoke('git:listBranches'),
+  listPRs: () =>
+    ipcRenderer.invoke('git:listPRs'),
   verifyTool: (payload: ToolsVerifyPayload) =>
     ipcRenderer.invoke('tools:verify', payload),
   resetApp: () =>

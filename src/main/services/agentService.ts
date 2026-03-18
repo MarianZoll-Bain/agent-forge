@@ -7,6 +7,7 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 import * as crypto from 'node:crypto'
 import type { Agent } from '../../shared/types'
+import type { BranchEntry, PREntry } from '../../shared/ipc-channels'
 
 // ---- Path helpers ----
 
@@ -79,25 +80,113 @@ async function doCreateGitWorktree(
     if (localExists) {
       await execa('git', ['worktree', 'add', worktreePath, branchName], { cwd: repoPath })
     } else {
-      const remoteExists = await remoteBranchExists(repoPath, baseBranch)
-      if (!remoteExists) {
-        return {
-          ok: false,
-          code: 'NO_REMOTE_BRANCH',
-          message: `Remote branch origin/${baseBranch} not found. Check the base branch name.`,
+      // Check if the branch itself exists on remote (existing remote branch scenario)
+      const remoteBranchSameName = await remoteBranchExists(repoPath, branchName)
+      if (remoteBranchSameName) {
+        // Create worktree tracking the remote branch with the same name
+        await execa(
+          'git',
+          ['worktree', 'add', '-b', branchName, worktreePath, `origin/${branchName}`],
+          { cwd: repoPath },
+        )
+      } else {
+        // New branch: create from base branch
+        const remoteExists = await remoteBranchExists(repoPath, baseBranch)
+        if (!remoteExists) {
+          return {
+            ok: false,
+            code: 'NO_REMOTE_BRANCH',
+            message: `Remote branch origin/${baseBranch} not found. Check the base branch name.`,
+          }
         }
+        await execa(
+          'git',
+          ['worktree', 'add', '-b', branchName, worktreePath, `origin/${baseBranch}`],
+          { cwd: repoPath },
+        )
       }
-      await execa(
-        'git',
-        ['worktree', 'add', '-b', branchName, worktreePath, `origin/${baseBranch}`],
-        { cwd: repoPath },
-      )
     }
     return { ok: true }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     return { ok: false, code: 'WORKTREE_CREATE_FAILED', message: `Failed to create worktree: ${msg}` }
   }
+}
+
+// ---- Branch listing ----
+
+export async function listRepoBranches(repoPath: string): Promise<BranchEntry[]> {
+  const { execa } = await import('execa')
+
+  // Fetch latest remote refs
+  try {
+    await execa('git', ['fetch', 'origin'], { cwd: repoPath })
+  } catch {
+    // Non-fatal: we can still list local + cached remote branches
+  }
+
+  const { stdout } = await execa('git', ['branch', '-a', '--no-color'], { cwd: repoPath })
+
+  const localBranches = new Set<string>()
+  const remoteBranches = new Set<string>()
+
+  for (const line of stdout.split('\n')) {
+    const trimmed = line.replace(/^\*?\s+/, '').trim()
+    if (!trimmed) continue
+    // Skip detached HEAD entries like "remotes/origin/HEAD -> origin/main"
+    if (trimmed.includes('->')) continue
+
+    if (trimmed.startsWith('remotes/origin/')) {
+      const name = trimmed.replace('remotes/origin/', '')
+      if (name) remoteBranches.add(name)
+    } else {
+      localBranches.add(trimmed)
+    }
+  }
+
+  // Merge: deduplicate where local + remote exist
+  const allNames = new Set([...localBranches, ...remoteBranches])
+  const entries: BranchEntry[] = []
+  for (const name of allNames) {
+    entries.push({
+      name,
+      isLocal: localBranches.has(name),
+      isRemote: remoteBranches.has(name),
+    })
+  }
+
+  entries.sort((a, b) => a.name.localeCompare(b.name))
+  return entries
+}
+
+// ---- PR listing ----
+
+export async function listRepoPRs(repoPath: string): Promise<PREntry[]> {
+  const { execa } = await import('execa')
+  const { stdout } = await execa(
+    'gh',
+    ['pr', 'list', '--json', 'number,title,headRefName,author,url,isDraft', '--limit', '50', '--state', 'open'],
+    { cwd: repoPath, timeout: 10_000 },
+  )
+  const raw: Array<{
+    number: number
+    title: string
+    headRefName: string
+    author: { login: string }
+    url: string
+    isDraft: boolean
+  }> = JSON.parse(stdout)
+
+  return raw
+    .map((pr) => ({
+      number: pr.number,
+      title: pr.title,
+      branchName: pr.headRefName,
+      author: pr.author.login,
+      url: pr.url,
+      isDraft: pr.isDraft,
+    }))
+    .sort((a, b) => b.number - a.number)
 }
 
 // ---- Public API ----

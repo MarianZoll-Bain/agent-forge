@@ -144,6 +144,55 @@ export interface SettingsUpdateError {
 
 export type SettingsUpdateResponse = SettingsUpdateResult | SettingsUpdateError
 
+// ---- Git channels ----
+
+/** List all branches (local + remote) for the current repo */
+export const GIT_LIST_BRANCHES = 'git:listBranches' as const
+
+/** List open PRs for the current repo via GitHub CLI */
+export const GIT_LIST_PRS = 'git:listPRs' as const
+
+export interface BranchEntry {
+  name: string
+  isLocal: boolean
+  isRemote: boolean
+}
+
+export interface GitListBranchesResult {
+  ok: true
+  branches: BranchEntry[]
+}
+
+export interface GitListBranchesError {
+  ok: false
+  code: string
+  message: string
+}
+
+export type GitListBranchesResponse = GitListBranchesResult | GitListBranchesError
+
+export interface PREntry {
+  number: number
+  title: string
+  branchName: string
+  author: string
+  url: string
+  isDraft: boolean
+}
+
+export interface GitListPRsResult {
+  ok: true
+  prs: PREntry[]
+}
+
+export interface GitListPRsError {
+  ok: false
+  code: string
+  message: string
+}
+
+export type GitListPRsResponse = GitListPRsResult | GitListPRsError
+
 // ---- Sprint 3 channels ----
 
 /** Get git status for an agent's worktree (dirty, branch, SHA, ahead/behind) */
@@ -374,6 +423,8 @@ export type PreloadAPI = {
   savePrompt: (payload: PromptsSavePayload) => Promise<PromptsSaveResponse>
   deletePrompt: (payload: PromptsDeletePayload) => Promise<PromptsDeleteResponse>
   changePromptScope: (payload: PromptsChangeScopePayload) => Promise<PromptsChangeScopeResponse>
+  listBranches: () => Promise<GitListBranchesResponse>
+  listPRs: () => Promise<GitListPRsResponse>
   verifyTool: (payload: ToolsVerifyPayload) => Promise<ToolsVerifyResponse>
   resetApp: () => Promise<AppResetResponse>
   getAgentPRStatus: (payload: AgentPRStatusPayload) => Promise<AgentPRStatusResponse>

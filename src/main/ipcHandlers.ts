@@ -13,7 +13,7 @@ import { ensureWorktreesDirectory } from './services/worktreeManager'
 import { readAgentsMd } from './services/agentsMdReader'
 import { loadState, saveState } from './services/stateManager'
 import { validateBranchName } from './services/gitValidator'
-import { createWorktreeForAgent, discoverExistingWorktrees } from './services/agentService'
+import { createWorktreeForAgent, discoverExistingWorktrees, listRepoBranches, listRepoPRs } from './services/agentService'
 import { getGitStatus } from './services/gitStatusService'
 import { removeWorktree, pullMainBranch } from './services/gitOperations'
 import { openAgent } from './services/agentOpener'
@@ -40,6 +40,8 @@ import type {
   ToolsVerifyResponse,
   AppResetResponse,
   AgentPRStatusResponse,
+  GitListBranchesResponse,
+  GitListPRsResponse,
 } from '../shared/ipc-channels'
 import type { AppState } from '../shared/types'
 import { defaultState } from './services/stateManager'
@@ -598,6 +600,48 @@ async function handleAppReset(
   return { ok: true, state }
 }
 
+async function handleListBranches(
+  event: Electron.IpcMainInvokeEvent,
+): Promise<GitListBranchesResponse> {
+  if (!isSenderAllowed(event)) {
+    return { ok: false, code: 'FORBIDDEN', message: 'Invalid sender' }
+  }
+  const stateResult = loadState()
+  if (!stateResult.ok) return { ok: false, code: stateResult.code, message: stateResult.message }
+  const { repoPath } = stateResult.state
+  if (!repoPath) {
+    return { ok: false, code: 'NO_REPO', message: 'No repository selected' }
+  }
+  try {
+    const branches = await listRepoBranches(repoPath)
+    return { ok: true, branches }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    return { ok: false, code: 'LIST_BRANCHES_FAILED', message: msg }
+  }
+}
+
+async function handleListPRs(
+  event: Electron.IpcMainInvokeEvent,
+): Promise<GitListPRsResponse> {
+  if (!isSenderAllowed(event)) {
+    return { ok: false, code: 'FORBIDDEN', message: 'Invalid sender' }
+  }
+  const stateResult = loadState()
+  if (!stateResult.ok) return { ok: false, code: stateResult.code, message: stateResult.message }
+  const { repoPath } = stateResult.state
+  if (!repoPath) {
+    return { ok: false, code: 'NO_REPO', message: 'No repository selected' }
+  }
+  try {
+    const prs = await listRepoPRs(repoPath)
+    return { ok: true, prs }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    return { ok: false, code: 'LIST_PRS_FAILED', message: msg }
+  }
+}
+
 export function registerIpcHandlers(): void {
   ipcMain.handle('repo:select', (event) => {
     return handleSelectRepository(event)
@@ -629,6 +673,14 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('settings:update', (event, payload: unknown) => {
     return handleSettingsUpdate(event, payload)
+  })
+
+  ipcMain.handle('git:listBranches', (event) => {
+    return handleListBranches(event)
+  })
+
+  ipcMain.handle('git:listPRs', (event) => {
+    return handleListPRs(event)
   })
 
   ipcMain.handle('agent:gitStatus', (event, payload: unknown) => {
