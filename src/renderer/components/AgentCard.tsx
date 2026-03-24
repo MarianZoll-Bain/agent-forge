@@ -210,6 +210,7 @@ const TOOL_BUTTON_STYLES: Record<string, string> = {
   cursor: 'bg-violet-100 hover:bg-violet-200 text-violet-700 dark:bg-violet-500/15 dark:hover:bg-violet-500/25 dark:text-violet-300 border border-violet-200/80 dark:border-violet-500/20',
   claude: 'bg-orange-100 hover:bg-orange-200 text-orange-700 dark:bg-orange-500/15 dark:hover:bg-orange-500/25 dark:text-orange-300 border border-orange-200/80 dark:border-orange-500/20',
   'claude-ollama': 'bg-amber-100 hover:bg-amber-200 text-amber-700 dark:bg-amber-500/15 dark:hover:bg-amber-500/25 dark:text-amber-300 border border-amber-200/80 dark:border-amber-500/20',
+  terminal: 'bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-500/15 dark:hover:bg-slate-500/25 dark:text-slate-300 border border-slate-200/80 dark:border-slate-500/20',
 }
 
 // ---- Main component ----
@@ -231,6 +232,7 @@ export function AgentCard({ agent, onRemove }: AgentCardProps) {
   const [removeBusy, setRemoveBusy] = useState(false)
   const [removeError, setRemoveError] = useState<string | null>(null)
   const [openBusy, setOpenBusy] = useState<string | null>(null)
+  const [pullBusy, setPullBusy] = useState(false)
 
   const fetchGitStatus = useCallback(async () => {
     const api = window.agentForge
@@ -268,7 +270,27 @@ export function AgentCard({ agent, onRemove }: AgentCardProps) {
     }
   }, [enableGitMode, fetchPRStatus])
 
-  const handleOpen = useCallback(async (tool: 'cursor' | 'claude' | 'claude-ollama') => {
+  const handlePull = useCallback(async () => {
+    const api = window.agentForge
+    if (!api || pullBusy) return
+    setPullBusy(true)
+    try {
+      const result = await api.pullAgent({ agentId: agent.id })
+      if (result.ok) {
+        addToast(`Pulled ${agent.name}: ${result.summary} (${result.updatedSha})`, 'success')
+        fetchGitStatus()
+      } else {
+        addToast(`Pull failed for ${agent.name}: ${result.message}`, 'error')
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      addToast(`Pull failed: ${msg}`, 'error')
+    } finally {
+      setPullBusy(false)
+    }
+  }, [agent.id, agent.name, pullBusy, addToast, fetchGitStatus])
+
+  const handleOpen = useCallback(async (tool: 'cursor' | 'claude' | 'claude-ollama' | 'terminal') => {
     const api = window.agentForge
     if (!api || openBusy) return
     setActionError(null)
@@ -349,14 +371,49 @@ export function AgentCard({ agent, onRemove }: AgentCardProps) {
 
       {/* Git status */}
       {gitStatus && (
-        <div className="px-4 pb-3">
-          <GitStatusBadge
-            dirty={gitStatus.dirty}
-            branch={gitStatus.branch}
-            lastCommitSha={gitStatus.lastCommitSha}
-            aheadBehind={gitStatus.aheadBehind}
-            refreshing={bulkRefreshing}
-          />
+        <div className="flex items-center gap-2 px-4 pb-3">
+          <div className="flex-1 min-w-0">
+            <GitStatusBadge
+              dirty={gitStatus.dirty}
+              branch={gitStatus.branch}
+              lastCommitSha={gitStatus.lastCommitSha}
+              aheadBehind={gitStatus.aheadBehind}
+              refreshing={bulkRefreshing}
+            />
+          </div>
+          <div className="flex items-center gap-1 shrink-0">
+            <button
+              type="button"
+              onClick={handlePull}
+              disabled={pullBusy || bulkRefreshing}
+              title="Pull latest changes"
+              aria-label="Pull latest changes"
+              className="p-1 rounded-md text-slate-400 dark:text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 transition-colors disabled:opacity-40"
+            >
+              {pullBusy ? (
+                <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+              ) : (
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                </svg>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={fetchGitStatus}
+              disabled={bulkRefreshing}
+              title="Refresh git status"
+              aria-label="Refresh git status"
+              className="p-1 rounded-md text-slate-400 dark:text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 transition-colors disabled:opacity-40"
+            >
+              <svg className={`w-3.5 h-3.5 ${bulkRefreshing ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+            </button>
+          </div>
         </div>
       )}
 
@@ -509,6 +566,21 @@ export function AgentCard({ agent, onRemove }: AgentCardProps) {
             )}
           </button>
         )}
+        <button
+          type="button"
+          onClick={() => handleOpen('terminal')}
+          disabled={!!openBusy}
+          className={`px-3 py-1.5 text-xs rounded-lg font-semibold disabled:opacity-40 disabled:cursor-not-allowed transition-colors ${TOOL_BUTTON_STYLES.terminal}`}
+        >
+          {openBusy === 'terminal' ? 'Opening...' : (
+            <span className="inline-flex items-center gap-1.5">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              Terminal
+            </span>
+          )}
+        </button>
         {!settings?.enableCursor && !settings?.enableClaude && !settings?.enableClaudeOllama && (
           <span className="text-xs text-slate-400 dark:text-slate-600 italic">Enable tools in Settings</span>
         )}

@@ -106,11 +106,11 @@ export type AgentCreateResponse = AgentCreateResult | AgentCreateError
 
 export interface AgentOpenPayload {
   agentId: string
-  tool: 'cursor' | 'claude' | 'claude-ollama'
+  tool: 'cursor' | 'claude' | 'claude-ollama' | 'terminal'
 }
 
 export interface RepoOpenPayload {
-  tool: 'cursor' | 'claude' | 'claude-ollama'
+  tool: 'cursor' | 'claude' | 'claude-ollama' | 'terminal'
 }
 
 export type RepoOpenResponse = AgentOpenResult | AgentOpenError
@@ -192,6 +192,29 @@ export interface GitListPRsError {
 }
 
 export type GitListPRsResponse = GitListPRsResult | GitListPRsError
+
+// ---- Agent pull channel ----
+
+/** Pull latest changes into an agent's worktree (ff-only) */
+export const AGENT_PULL = 'agent:pull' as const
+
+export interface AgentPullPayload {
+  agentId: string
+}
+
+export interface AgentPullResult {
+  ok: true
+  updatedSha: string
+  summary: string
+}
+
+export interface AgentPullError {
+  ok: false
+  code: string
+  message: string
+}
+
+export type AgentPullResponse = AgentPullResult | AgentPullError
 
 // ---- Sprint 3 channels ----
 
@@ -429,6 +452,7 @@ export interface AppVersionResponse {
 export type PreloadAPI = {
   selectRepository: () => Promise<RepoSelectResponse>
   pullRepo: (payload: RepoPullPayload) => Promise<RepoPullResponse>
+  pullAgent: (payload: AgentPullPayload) => Promise<AgentPullResponse>
   getState: () => Promise<StateGetResponse>
   validateBranchName: (payload: AgentValidateBranchPayload) => Promise<AgentValidateBranchResponse>
   createAgent: (payload: AgentCreatePayload) => Promise<AgentCreateResponse>

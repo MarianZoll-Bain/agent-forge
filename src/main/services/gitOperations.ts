@@ -65,6 +65,47 @@ export async function pullMainBranch(
   }
 }
 
+// ---- Pull worktree (ff-only) ----
+
+export interface PullWorktreeSuccess {
+  ok: true
+  updatedSha: string
+  summary: string
+}
+
+export interface PullWorktreeError {
+  ok: false
+  code: string
+  message: string
+}
+
+export type PullWorktreeResponse = PullWorktreeSuccess | PullWorktreeError
+
+export async function pullWorktree(
+  worktreePath: string,
+  branch: string,
+): Promise<PullWorktreeResponse> {
+  try {
+    const { execa } = await import('execa')
+
+    await execa('git', ['fetch', 'origin'], { cwd: worktreePath })
+
+    const pullResult = await execa('git', ['pull', '--ff-only', 'origin', branch], { cwd: worktreePath })
+
+    const shaResult = await execa('git', ['rev-parse', '--short', 'HEAD'], { cwd: worktreePath })
+    const updatedSha = shaResult.stdout.trim()
+
+    const summary = pullResult.stdout.trim() || 'Already up to date.'
+    return { ok: true, updatedSha, summary }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    if (msg.includes('Not possible to fast-forward') || msg.includes('fatal: Not possible')) {
+      return { ok: false, code: 'FF_ONLY_FAILED', message: `Cannot fast-forward ${branch}. Local branch has diverged from origin.` }
+    }
+    return { ok: false, code: 'PULL_FAILED', message: msg }
+  }
+}
+
 export async function removeWorktree(
   repoPath: string,
   worktreePath: string,

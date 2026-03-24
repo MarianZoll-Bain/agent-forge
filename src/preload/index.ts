@@ -20,12 +20,15 @@ import type {
   PromptsChangeScopePayload,
   ToolsVerifyPayload,
   AgentPRStatusPayload,
+  AgentPullPayload,
 } from '../shared/ipc-channels'
 
 const api = {
   selectRepository: () => ipcRenderer.invoke('repo:select'),
   pullRepo: (payload: RepoPullPayload) =>
     ipcRenderer.invoke('repo:pull', payload),
+  pullAgent: (payload: AgentPullPayload) =>
+    ipcRenderer.invoke('agent:pull', payload),
   getState: () => ipcRenderer.invoke('state:get'),
   validateBranchName: (payload: AgentValidateBranchPayload) =>
     ipcRenderer.invoke('agent:validateBranch', payload),

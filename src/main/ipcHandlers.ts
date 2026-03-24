@@ -15,8 +15,8 @@ import { loadState, saveState } from './services/stateManager'
 import { validateBranchName } from './services/gitValidator'
 import { createWorktreeForAgent, discoverExistingWorktrees, listRepoBranches, listRepoPRs } from './services/agentService'
 import { getGitStatus } from './services/gitStatusService'
-import { removeWorktree, pullMainBranch } from './services/gitOperations'
-import { openAgent } from './services/agentOpener'
+import { removeWorktree, pullMainBranch, pullWorktree } from './services/gitOperations'
+import { openAgent, closeAgentWindows } from './services/agentOpener'
 import * as promptManager from './services/promptManager'
 import { verifyTool } from './services/toolVerifier'
 import { getPRStatus } from './services/prStatusService'
@@ -41,6 +41,7 @@ import type {
   ToolsVerifyResponse,
   AppResetResponse,
   AgentPRStatusResponse,
+  AgentPullResponse,
   GitListBranchesResponse,
   GitListPRsResponse,
   WindowTileResponse,
@@ -219,11 +220,11 @@ const AgentCreateSchema = z.object({
 
 const AgentOpenSchema = z.object({
   agentId: z.string().min(1),
-  tool: z.enum(['cursor', 'claude', 'claude-ollama']),
+  tool: z.enum(['cursor', 'claude', 'claude-ollama', 'terminal']),
 })
 
 const RepoOpenSchema = z.object({
-  tool: z.enum(['cursor', 'claude', 'claude-ollama']),
+  tool: z.enum(['cursor', 'claude', 'claude-ollama', 'terminal']),
 })
 
 const SettingsUpdateSchema = z.object({
@@ -246,6 +247,7 @@ const SettingsUpdateSchema = z.object({
 
 const RepoPullSchema = z.object({ branch: z.string().min(1) })
 const AgentGitStatusSchema = z.object({ agentId: z.string().min(1) })
+const AgentPullSchema = z.object({ agentId: z.string().min(1) })
 const AgentRemoveSchema = z.object({
   agentId: z.string().min(1),
   deleteWorktree: z.boolean().optional(),
@@ -439,6 +441,26 @@ async function handleAgentGitStatus(
   return { ok: true, ...result.status }
 }
 
+async function handleAgentPull(
+  event: Electron.IpcMainInvokeEvent,
+  payload: unknown,
+): Promise<AgentPullResponse> {
+  if (!isSenderAllowed(event)) {
+    return { ok: false, code: 'FORBIDDEN', message: 'Invalid sender' }
+  }
+  const parsed = AgentPullSchema.safeParse(payload)
+  if (!parsed.success) {
+    return { ok: false, code: 'VALIDATION_FAILED', message: 'agentId is required' }
+  }
+  const stateResult = loadState()
+  if (!stateResult.ok) return { ok: false, code: stateResult.code, message: stateResult.message }
+  const agent = stateResult.state.agents.find((a) => a.id === parsed.data.agentId)
+  if (!agent) return { ok: false, code: 'AGENT_NOT_FOUND', message: 'Agent not found' }
+
+  logger.info(`agent:pull agentId=${parsed.data.agentId} branch=${agent.branchName}`)
+  return pullWorktree(agent.worktreePath, agent.branchName)
+}
+
 async function handleAgentRemove(
   event: Electron.IpcMainInvokeEvent,
   payload: unknown,
@@ -457,6 +479,11 @@ async function handleAgentRemove(
   const state = stateResult.state
   const agent = state.agents.find((a) => a.id === agentId)
   if (!agent) return { ok: false, code: 'AGENT_NOT_FOUND', message: 'Agent not found' }
+
+  // Close any open Terminal/Cursor windows for this agent before removing
+  if (agent.worktreePath) {
+    await closeAgentWindows(agent.name, agent.worktreePath)
+  }
 
   let worktreeRemoveError: string | undefined
   if (deleteWorktree && agent.worktreePath && state.repoPath) {
@@ -698,6 +725,10 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('agent:gitStatus', (event, payload: unknown) => {
     return handleAgentGitStatus(event, payload)
+  })
+
+  ipcMain.handle('agent:pull', (event, payload: unknown) => {
+    return handleAgentPull(event, payload)
   })
 
   ipcMain.handle('agent:remove', (event, payload: unknown) => {

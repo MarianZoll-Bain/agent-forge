@@ -9,16 +9,10 @@ import { useAppStore } from '../store/useAppStore'
 
 export function AgentBoard() {
   const agents = useAppStore((s) => s.state?.agents ?? [])
-  const hasRepo = useAppStore((s) => s.hasRepo())
   const draftAgents = useAppStore((s) => s.draftAgents)
-  const addDraftAgent = useAppStore((s) => s.addDraftAgent)
   const refreshState = useAppStore((s) => s.refreshState)
   const refreshAllStatuses = useAppStore((s) => s.refreshAllStatuses)
   const refreshingAll = useAppStore((s) => s.refreshingAllStatuses)
-
-  function handleAdd() {
-    addDraftAgent()
-  }
 
   function handleRemove() {
     refreshState()
@@ -36,18 +30,6 @@ export function AgentBoard() {
             </span>
           )}
         </div>
-        <button
-          type="button"
-          onClick={handleAdd}
-          disabled={!hasRepo}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 via-indigo-600 to-violet-600 hover:from-indigo-600 hover:via-indigo-700 hover:to-violet-700 text-white font-semibold shadow-lg shadow-indigo-500/25 hover:shadow-xl hover:shadow-indigo-500/30 transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none"
-          title={hasRepo ? 'Add worktree' : 'Select a repository first'}
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
-          </svg>
-          Add worktree
-        </button>
       </div>
 
       <div className="flex-1 min-h-0 rounded-2xl border border-slate-200/80 dark:border-white/[0.06] bg-white/60 dark:bg-white/[0.02] overflow-auto">
