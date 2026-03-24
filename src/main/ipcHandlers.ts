@@ -799,8 +799,8 @@ export function registerIpcHandlers(): void {
     downloadUpdate()
   })
 
-  ipcMain.handle('updater:install', (event) => {
+  ipcMain.handle('updater:install', async (event) => {
     if (!isSenderAllowed(event)) return
-    installUpdate()
+    await installUpdate()
   })
 }

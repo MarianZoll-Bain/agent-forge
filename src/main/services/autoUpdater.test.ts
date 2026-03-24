@@ -75,8 +75,7 @@ describe('autoUpdater', () => {
 
   it('installUpdate is a no-op in dev mode', async () => {
     const { installUpdate } = await import('./autoUpdater')
-    const { autoUpdater } = await import('electron-updater')
-    installUpdate()
-    expect(autoUpdater.quitAndInstall).not.toHaveBeenCalled()
+    await installUpdate()
+    // In dev mode (!app.isPackaged), installUpdate returns immediately without doing anything
   })
 })

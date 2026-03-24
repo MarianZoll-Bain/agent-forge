@@ -24,6 +24,7 @@ export default function App() {
   // Track which update toasts have already been shown to prevent duplicates
   const shownUpdateToastRef = useRef<string | null>(null)
   const shownDownloadToastRef = useRef(false)
+  const shownErrorToastRef = useRef<string | null>(null)
 
   useEffect(() => {
     const api = window.agentForge
@@ -61,6 +62,13 @@ export default function App() {
       if (status.downloaded && !shownDownloadToastRef.current) {
         shownDownloadToastRef.current = true
         addToastRef.current('Update downloaded — restart to apply', 'success')
+      }
+      if (status.error && shownErrorToastRef.current !== status.error) {
+        shownErrorToastRef.current = status.error
+        addToastRef.current(`Update error: ${status.error}`, 'error')
+      }
+      if (!status.error) {
+        shownErrorToastRef.current = null
       }
     })
 

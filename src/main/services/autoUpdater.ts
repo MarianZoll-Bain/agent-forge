@@ -1,12 +1,20 @@
 /**
  * Auto-update service wrapping electron-updater.
  * No-op in dev mode (!app.isPackaged). Sends status events to the renderer.
+ *
+ * On macOS, Squirrel.Mac silently fails with ad-hoc signed builds, so we
+ * bypass it entirely: electron-updater downloads the zip, and we manually
+ * extract + swap the .app bundle using ditto + mv.
  */
 
 import { app } from 'electron'
 import type { BrowserWindow } from 'electron'
 import { autoUpdater } from 'electron-updater'
 import type { UpdateInfo } from 'electron-updater'
+import { promises as fs } from 'node:fs'
+import path from 'node:path'
+import os from 'node:os'
+import { spawn } from 'node:child_process'
 import type { UpdateStatus } from '../../shared/types'
 import { UPDATER_STATUS } from '../../shared/ipc-channels'
 import { logger } from '../logger'
@@ -72,14 +80,145 @@ export function downloadUpdate(): void {
   })
 }
 
-export function installUpdate(): void {
+/**
+ * Returns the path to the updater cache directory used by electron-updater.
+ * On macOS this is ~/Library/Caches/<app-name>-updater/pending/
+ */
+function getUpdaterCacheDir(): string {
+  const appName = app.getName()
+  return path.join(os.homedir(), 'Library', 'Caches', `${appName}-updater`, 'pending')
+}
+
+/**
+ * Find the downloaded update zip in the updater cache.
+ * electron-updater writes an update-info.json alongside the zip.
+ */
+async function findDownloadedZip(): Promise<string | null> {
+  const cacheDir = getUpdaterCacheDir()
+  try {
+    const files = await fs.readdir(cacheDir)
+    // Look for .zip files (not temp-* stale ones — those get cleaned up on init)
+    const zipFile = files.find((f) => f.endsWith('.zip') && !f.startsWith('temp-'))
+    if (zipFile) return path.join(cacheDir, zipFile)
+
+    // Fallback: any .zip
+    const anyZip = files.find((f) => f.endsWith('.zip'))
+    if (anyZip) return path.join(cacheDir, anyZip)
+  } catch {
+    // Cache dir doesn't exist or isn't readable
+  }
+  return null
+}
+
+/**
+ * Clean up stale temp-*.zip files left by failed Squirrel attempts.
+ */
+async function cleanupStaleTempFiles(): Promise<void> {
+  const cacheDir = getUpdaterCacheDir()
+  try {
+    const files = await fs.readdir(cacheDir)
+    for (const f of files) {
+      if (f.startsWith('temp-') && f.endsWith('.zip')) {
+        const filePath = path.join(cacheDir, f)
+        logger.info(`autoUpdater: cleaning up stale temp file: ${f}`)
+        await fs.unlink(filePath).catch(() => {})
+      }
+    }
+  } catch {
+    // Cache dir doesn't exist — nothing to clean
+  }
+}
+
+/**
+ * Spawn a process with argument array. Returns a promise that resolves on exit 0.
+ * Uses child_process.spawn directly with argument arrays (no shell).
+ */
+function spawnAsync(cmd: string, args: string[]): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(cmd, args, { stdio: 'pipe' })
+    let stderr = ''
+    child.stderr?.on('data', (chunk: Buffer) => { stderr += chunk.toString() })
+    child.on('error', reject)
+    child.on('close', (code) => {
+      if (code === 0) resolve()
+      else reject(new Error(`${cmd} exited with code ${code}: ${stderr.trim()}`))
+    })
+  })
+}
+
+/**
+ * Manual install: extract zip and swap app bundle, bypassing Squirrel.
+ *
+ * Steps:
+ * 1. Find the downloaded zip
+ * 2. Extract with ditto -xk to a temp directory
+ * 3. Move old .app to backup, move new .app into place
+ * 4. Relaunch via `open` and quit current instance
+ * 5. Spawn a detached cleanup process to remove backup + temp
+ */
+export async function installUpdate(): Promise<void> {
   if (!app.isPackaged) return
-  // Stop periodic checks so they don't interfere with quit
+
   stopAutoUpdater()
-  // Defer quitAndInstall slightly so the IPC response can reach the renderer
-  setTimeout(() => {
-    autoUpdater.quitAndInstall(false, true)
-  }, 300)
+
+  try {
+    // 1. Locate downloaded zip
+    const zipPath = await findDownloadedZip()
+    if (!zipPath) {
+      throw new Error('Downloaded update zip not found in cache')
+    }
+    logger.info(`autoUpdater: installing from ${zipPath}`)
+
+    // 2. Determine paths
+    // app.getPath('exe') returns e.g. /Applications/AgentForge.app/Contents/MacOS/AgentForge
+    const exePath = app.getPath('exe')
+    const appBundlePath = path.resolve(exePath, '..', '..', '..') // -> /Applications/AgentForge.app
+    const appBundleDir = path.dirname(appBundlePath) // -> /Applications
+    const appBundleName = path.basename(appBundlePath) // -> AgentForge.app
+
+    // Temp dir for extraction
+    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'agent-forge-update-'))
+    // Backup path for old app
+    const backupPath = path.join(os.tmpdir(), `agent-forge-backup-${Date.now()}.app`)
+
+    // 3. Extract zip with ditto (macOS native, preserves attrs + resource forks)
+    logger.info('autoUpdater: extracting update zip')
+    await spawnAsync('/usr/bin/ditto', ['-xk', zipPath, tmpDir])
+
+    // Find the .app inside the extracted directory
+    const extracted = await fs.readdir(tmpDir)
+    const newAppName = extracted.find((f) => f.endsWith('.app'))
+    if (!newAppName) {
+      throw new Error('No .app bundle found in extracted update')
+    }
+    const newAppPath = path.join(tmpDir, newAppName)
+
+    // 4. Swap bundles: move old to backup, move new into place
+    logger.info('autoUpdater: swapping app bundles')
+    await spawnAsync('/bin/mv', [appBundlePath, backupPath])
+    await spawnAsync('/bin/mv', [newAppPath, path.join(appBundleDir, appBundleName)])
+
+    // 5. Relaunch the new app
+    logger.info('autoUpdater: relaunching')
+    const newExePath = path.join(appBundleDir, appBundleName)
+    spawn('/usr/bin/open', ['-n', newExePath], { detached: true, stdio: 'ignore' }).unref()
+
+    // 6. Spawn detached cleanup process (removes backup + temp dir after a short delay)
+    spawn('/bin/sh', ['-c', `sleep 3 && rm -rf "${backupPath}" "${tmpDir}"`], {
+      detached: true,
+      stdio: 'ignore',
+    }).unref()
+
+    // 7. Clean up the cache zip so it doesn't get re-applied
+    await fs.unlink(zipPath).catch(() => {})
+
+    // 8. Quit current instance
+    app.quit()
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Install failed'
+    logger.error('autoUpdater: install failed:', message)
+    updateStatus({ error: message, downloaded: false })
+  }
 }
 
 function extractReleaseNotes(info: UpdateInfo): string | null {
@@ -100,7 +239,8 @@ export function initAutoUpdater(mainWindow: BrowserWindow): void {
   win = mainWindow
 
   autoUpdater.autoDownload = false
-  autoUpdater.autoInstallOnAppQuit = true
+  // Disable Squirrel's auto-install — we handle install manually
+  autoUpdater.autoInstallOnAppQuit = false
   autoUpdater.logger = null // we handle logging ourselves
 
   autoUpdater.on('checking-for-update', () => {
@@ -135,7 +275,12 @@ export function initAutoUpdater(mainWindow: BrowserWindow): void {
 
   autoUpdater.on('error', (err: Error) => {
     logger.warn('autoUpdater error:', err.message)
-    updateStatus({ checking: false, downloading: false, downloadProgress: 0, error: err.message })
+    updateStatus({ checking: false, downloading: false, downloadProgress: 0, downloaded: false, error: err.message })
+  })
+
+  // Clean up stale temp files from previous failed Squirrel attempts
+  cleanupStaleTempFiles().catch((err: unknown) => {
+    logger.warn('autoUpdater: stale cleanup failed:', err)
   })
 
   // Delayed first check
