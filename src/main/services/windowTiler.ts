@@ -37,6 +37,15 @@ function run() {
     } catch(e) { return false; }
   });
 
+  // Sort by custom title so the left-to-right order is deterministic across runs.
+  wins.sort((a, b) => {
+    try {
+      const ta = a.customTitle() || a.name() || '';
+      const tb = b.customTitle() || b.name() || '';
+      return ta.localeCompare(tb);
+    } catch(e) { return 0; }
+  });
+
   const count = wins.length;
   if (count === 0) return JSON.stringify({ ok: true, tiledCount: 0 });
 
