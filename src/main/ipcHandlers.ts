@@ -162,6 +162,8 @@ async function handleProjectAdd(event: Electron.IpcMainInvokeEvent): Promise<Pro
     agentsMdContents: repo.agentsMdContents,
     agents: discoveredAgents,
     hasRootEnvFile: repo.hasRootEnvFile,
+    hasRootClaudeDir: fs.existsSync(path.join(repo.repoPath, '.claude')),
+    hasRootCursorDir: fs.existsSync(path.join(repo.repoPath, '.cursor')),
     colorIndex,
   }
 
@@ -404,6 +406,8 @@ const AgentCreateSchema = z.object({
   branchName: z.string().min(1),
   baseBranch: z.string().min(1),
   copyEnv: z.boolean().optional(),
+  copyClaudeConfig: z.boolean().optional(),
+  copyCursorConfig: z.boolean().optional(),
 })
 
 const AgentOpenSchema = z.object({
@@ -489,7 +493,7 @@ async function handleAgentCreate(
     const msg = parsed.error.issues.map((i) => i.message).join('; ')
     return { ok: false, code: 'VALIDATION_FAILED', message: msg }
   }
-  const { name, branchName, baseBranch, copyEnv } = parsed.data
+  const { name, branchName, baseBranch, copyEnv, copyClaudeConfig, copyCursorConfig } = parsed.data
 
   const stateResult = loadState()
   if (!stateResult.ok) {
@@ -509,6 +513,8 @@ async function handleAgentCreate(
     worktreesRootPath: project.worktreesRootPath,
     repoPath: project.repoPath,
     copyEnvToWorktree: copyEnv ?? true,
+    copyClaudeConfig: copyClaudeConfig ?? true,
+    copyCursorConfig: copyCursorConfig ?? true,
   })
   if (!result.ok) {
     logger.warn('agent:create failed:', result.code, result.message)
