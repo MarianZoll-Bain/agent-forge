@@ -430,6 +430,7 @@ const SettingsUpdateSchema = z.object({
     enableClaudeOllama: z.boolean().optional(),
     onboardingComplete: z.boolean().optional(),
     enableGitMode: z.boolean().optional(),
+    devServerPort: z.number().int().min(1024).max(65535).optional(),
   }),
 })
 

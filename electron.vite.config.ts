@@ -1,6 +1,20 @@
 import { resolve } from 'path'
+import { readFileSync } from 'fs'
+import { homedir } from 'os'
 import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
 import react from '@vitejs/plugin-react'
+
+function readDevServerPort(): number {
+  try {
+    const raw = readFileSync(resolve(homedir(), '.agent-forge/state.json'), 'utf-8')
+    const state = JSON.parse(raw)
+    const port = state?.settings?.devServerPort
+    if (typeof port === 'number' && Number.isInteger(port) && port >= 1024 && port <= 65535) return port
+  } catch { /* state file missing or malformed — use default */ }
+  return 5173
+}
+
+const devServerPort = readDevServerPort()
 
 export default defineConfig({
   main: {
@@ -33,6 +47,9 @@ export default defineConfig({
   },
   renderer: {
     root: 'src/renderer',
+    server: {
+      port: devServerPort,
+    },
     resolve: {
       alias: {
         '@shared': resolve(__dirname, 'src/shared'),

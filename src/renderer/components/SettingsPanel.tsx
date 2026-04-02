@@ -30,6 +30,7 @@ export function SettingsPanel({ onClose, onOpenOnboarding }: SettingsPanelProps)
   const [enableClaude, setEnableClaude] = useState(state?.settings.enableClaude ?? false)
   const [enableClaudeOllama, setEnableClaudeOllama] = useState(state?.settings.enableClaudeOllama ?? false)
   const [enableGitMode, setEnableGitMode] = useState(state?.settings.enableGitMode ?? false)
+  const [devServerPort, setDevServerPort] = useState(String(state?.settings.devServerPort ?? 5173))
   const [validationError, setValidationError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
@@ -46,6 +47,7 @@ export function SettingsPanel({ onClose, onOpenOnboarding }: SettingsPanelProps)
     setEnableClaude(state?.settings.enableClaude ?? false)
     setEnableClaudeOllama(state?.settings.enableClaudeOllama ?? false)
     setEnableGitMode(state?.settings.enableGitMode ?? false)
+    setDevServerPort(String(state?.settings.devServerPort ?? 5173))
   }, [state?.settings])
 
   async function handleSave() {
@@ -63,6 +65,11 @@ export function SettingsPanel({ onClose, onOpenOnboarding }: SettingsPanelProps)
       setValidationError('Worktrees directory name contains invalid characters')
       return
     }
+    const portNum = Number(devServerPort)
+    if (!Number.isInteger(portNum) || portNum < 1024 || portNum > 65535) {
+      setValidationError('Dev server port must be an integer between 1024 and 65535')
+      return
+    }
     setSaving(true)
     setSaveError(null)
     try {
@@ -75,6 +82,7 @@ export function SettingsPanel({ onClose, onOpenOnboarding }: SettingsPanelProps)
         enableClaude,
         enableClaudeOllama,
         enableGitMode,
+        devServerPort: portNum,
       }
       const result = await api.updateSettings({ settings: updatedSettings })
       if (!result.ok) {
@@ -222,6 +230,13 @@ export function SettingsPanel({ onClose, onOpenOnboarding }: SettingsPanelProps)
                   Worktrees directory
                 </label>
                 <input id="worktrees-dir" type="text" value={worktreesDirName} onChange={(e) => setWorktreesDirName(e.target.value)} placeholder=".worktrees" autoComplete="off" spellCheck={false} className={inputClass} />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5" htmlFor="dev-server-port">
+                  Dev server port
+                </label>
+                <input id="dev-server-port" type="number" min={1024} max={65535} value={devServerPort} onChange={(e) => setDevServerPort(e.target.value)} placeholder="5173" autoComplete="off" className={inputClass} />
+                <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">Requires restart. Range: 1024–65535</p>
               </div>
             </div>
           </section>

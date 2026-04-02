@@ -8,6 +8,7 @@ import { join } from 'path'
 import { registerIpcHandlers, setMainWindow } from './ipcHandlers'
 import { initAutoUpdater, stopAutoUpdater } from './services/autoUpdater'
 import { fixPath } from './services/fixPath'
+import { loadState } from './services/stateManager'
 import { logger } from './logger'
 
 // Fix PATH before anything else — packaged macOS apps get a minimal PATH
@@ -40,7 +41,9 @@ function createWindow(): BrowserWindow {
   win.on('closed', () => setMainWindow(null))
 
   if (isDev) {
-    win.loadURL(process.env.ELECTRON_RENDERER_URL ?? 'http://localhost:5173')
+    const stateResult = loadState()
+    const port = (stateResult.ok && stateResult.state.settings.devServerPort) || 5173
+    win.loadURL(process.env.ELECTRON_RENDERER_URL ?? `http://localhost:${port}`)
     win.webContents.openDevTools()
   } else {
     win.loadFile(join(__dirname, '../renderer/index.html'))
