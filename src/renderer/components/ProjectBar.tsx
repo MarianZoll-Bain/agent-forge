@@ -28,8 +28,6 @@ export function ProjectBar() {
   const settings = useAppStore((s) => s.state?.settings)
   const [switching, setSwitching] = useState(false)
   const [openBusy, setOpenBusy] = useState<Tool | null>(null)
-  const addDraftAgent = useAppStore((s) => s.addDraftAgent)
-  const hasRepo = useAppStore((s) => s.hasRepo())
   const [tiling, setTiling] = useState(false)
   const [tileToast, setTileToast] = useState<string | null>(null)
 
@@ -69,7 +67,7 @@ export function ProjectBar() {
       const result = await api.tileTerminals()
       if (result.ok) {
         const msg = result.tiledCount === 0
-          ? 'No agent terminals found'
+          ? 'No terminal windows found'
           : `Tiled ${result.tiledCount} terminal${result.tiledCount > 1 ? 's' : ''}`
         setTileToast(msg)
         setTimeout(() => setTileToast(null), 3000)
@@ -164,18 +162,6 @@ export function ProjectBar() {
           className="text-xs font-semibold px-3 py-1 rounded-lg text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 disabled:opacity-50 transition-colors"
         >
           {switching ? 'Switching...' : 'Switch'}
-        </button>
-        <button
-          type="button"
-          onClick={addDraftAgent}
-          disabled={!hasRepo}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 via-indigo-600 to-violet-600 hover:from-indigo-600 hover:via-indigo-700 hover:to-violet-700 text-white font-semibold shadow-lg shadow-indigo-500/25 hover:shadow-xl hover:shadow-indigo-500/30 transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none"
-          title={hasRepo ? 'Add worktree' : 'Select a repository first'}
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
-          </svg>
-          Add worktree
         </button>
       </div>
     </div>

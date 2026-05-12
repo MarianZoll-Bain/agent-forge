@@ -10,6 +10,7 @@ import { useAppStore } from '../store/useAppStore'
 export function AgentBoard() {
   const agents = useAppStore((s) => s.state?.agents ?? [])
   const draftAgents = useAppStore((s) => s.draftAgents)
+  const addDraftAgent = useAppStore((s) => s.addDraftAgent)
   const refreshState = useAppStore((s) => s.refreshState)
   const refreshAllStatuses = useAppStore((s) => s.refreshAllStatuses)
   const refreshingAll = useAppStore((s) => s.refreshingAllStatuses)
@@ -37,8 +38,19 @@ export function AgentBoard() {
           <EmptyState />
         ) : (
           <div className="p-5">
-            {agents.length > 0 && (
-              <div className="flex justify-end mb-4">
+            <div className="flex justify-end gap-2 mb-4">
+              <button
+                type="button"
+                onClick={addDraftAgent}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-gradient-to-r from-indigo-500 to-violet-600 hover:from-indigo-600 hover:to-violet-700 shadow-sm transition-all"
+                title="Add worktree"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+                </svg>
+                Add worktree
+              </button>
+              {agents.length > 0 && (
                 <button
                   type="button"
                   onClick={refreshAllStatuses}
@@ -52,8 +64,8 @@ export function AgentBoard() {
                   </svg>
                   <span>{refreshingAll ? 'Refreshing...' : 'Refresh all'}</span>
                 </button>
-              </div>
-            )}
+              )}
+            </div>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {draftAgents.map((draft) => (
                 <AgentSetupCard key={draft.id} draftId={draft.id} />

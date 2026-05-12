@@ -1,10 +1,13 @@
 /**
  * Agent opener service — launches external tools in a worktree directory.
  * Cursor: spawns detached `cursor <path>` process.
- * Claude: opens Terminal.app → `cd <path> && claude`.
- * Claude-Ollama: opens Terminal.app → `cd <path> && export ANTHROPIC_BASE_URL=... && claude --model <model>`.
+ * Claude/Claude-Ollama: opens Terminal.app inside a tmux session with a sticky header.
+ * Terminal: opens Terminal.app with a banner.
  */
 
+import * as fs from 'node:fs'
+import * as os from 'node:os'
+import * as path from 'node:path'
 import { logger } from '../logger'
 
 export type AgentTool = 'cursor' | 'claude' | 'claude-ollama' | 'terminal'
@@ -13,11 +16,115 @@ export interface OpenAgentOptions {
   ollamaModel?: string
   ollamaBaseUrl?: string
   agentName?: string
+  branchName?: string
+  prNumber?: number
 }
 
 /** Wrap a path in single quotes, escaping any embedded single quotes. */
 function shellSingleQuote(p: string): string {
   return `'${p.replace(/'/g, "'\\''")}'`
+}
+
+/** Escape a string for embedding inside a single-quoted shell string. */
+function escSQ(s: string): string {
+  return s.replace(/'/g, "'\\''")
+}
+
+/**
+ * Build a shell snippet that prints a colored banner and sets the tab title.
+ * Uses ANSI: blue background, bold white text.
+ */
+function shellBanner(name: string): string {
+  const safeName = escSQ(name)
+  return (
+    `printf '\\033]0;AgentForge: ${safeName}\\007'` +
+    ` && printf '\\n\\033[48;5;63;97;1m  %-78s\\033[0m\\n\\n' '${safeName}'`
+  )
+}
+
+/** Derive a tmux-safe session name from an agent name. */
+function tmuxSessionName(agentName: string): string {
+  return 'af-' + agentName.replace(/[^a-zA-Z0-9]/g, '-').replace(/-{2,}/g, '-').replace(/^-|-$/g, '').substring(0, 40)
+}
+
+/** Distinct tmux colour palette for status bars. */
+const STATUS_COLORS = [
+  'colour99',   // purple
+  'colour33',   // blue
+  'colour166',  // orange
+  'colour36',   // teal
+  'colour160',  // red
+  'colour70',   // green
+  'colour125',  // magenta
+  'colour172',  // gold
+  'colour62',   // slate-blue
+  'colour196',  // bright-red
+]
+
+/** Pick a deterministic colour from the palette based on a string hash. */
+function pickStatusColor(name: string): string {
+  let hash = 0
+  for (let i = 0; i < name.length; i++) {
+    hash = (hash * 31 + name.charCodeAt(i)) | 0
+  }
+  return STATUS_COLORS[Math.abs(hash) % STATUS_COLORS.length]
+}
+
+/**
+ * Write a launch script for a tmux-wrapped claude session.
+ * If tmux is available, the session gets a sticky colored status bar.
+ * If not, falls back to running the command directly.
+ * Returns the absolute path to the script.
+ */
+interface LaunchScriptOptions {
+  agentName: string
+  worktreePath: string
+  claudeCmd: string
+  branchName?: string
+  prNumber?: number
+}
+
+function writeLaunchScript(opts: LaunchScriptOptions): string {
+  const { agentName, worktreePath, claudeCmd, branchName, prNumber } = opts
+  const scriptDir = path.join(os.homedir(), '.agent-forge', 'scripts')
+  fs.mkdirSync(scriptDir, { recursive: true, mode: 0o700 })
+
+  const session = tmuxSessionName(agentName)
+  const scriptPath = path.join(scriptDir, `${session}.sh`)
+
+  // Build the right side: branch name + optional PR badge
+  const rightParts: string[] = []
+  if (prNumber) rightParts.push(`PR #${prNumber}`)
+  if (branchName) rightParts.push(branchName)
+  const rightText = rightParts.length > 0 ? `${rightParts.join(' · ')} ` : ''
+  const rightLen = rightText.length + 2
+
+  const script = `#!/bin/bash
+SESSION='${escSQ(session)}'
+WORK_DIR='${escSQ(worktreePath)}'
+CLAUDE_CMD='${escSQ(claudeCmd)}'
+DISPLAY_NAME='${escSQ(agentName)}'
+
+if command -v tmux >/dev/null 2>&1; then
+  if tmux has-session -t "$SESSION" 2>/dev/null; then
+    tmux attach -t "$SESSION"
+  else
+    tmux new-session -d -s "$SESSION" -x "$(tput cols)" -y "$(tput lines)"
+    tmux set-option -t "$SESSION" status-position top
+    tmux set-option -t "$SESSION" status-style 'bg=${pickStatusColor(agentName)},fg=colour255,bold'
+    tmux set-option -t "$SESSION" status-left " $DISPLAY_NAME "
+    tmux set-option -t "$SESSION" status-left-length 80
+    tmux set-option -t "$SESSION" status-right '${escSQ(rightText)}'
+    tmux set-option -t "$SESSION" status-right-length ${rightLen}
+    tmux send-keys -t "$SESSION" "cd \\"$WORK_DIR\\" && $CLAUDE_CMD" Enter
+    tmux attach -t "$SESSION"
+  fi
+else
+  cd "$WORK_DIR" && eval "$CLAUDE_CMD"
+fi
+`
+  fs.writeFileSync(scriptPath, script, { mode: 0o755 })
+  return scriptPath
 }
 
 /**
@@ -35,7 +142,13 @@ async function openTerminalRunning(shellCmd: string, windowTitle?: string): Prom
     ]
     if (windowTitle) {
       const safeTitle = windowTitle.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
-      lines.push(`  set custom title of window 1 to "${safeTitle}"`)
+      lines.push(`  set t to tab 1 of window 1`)
+      lines.push(`  set custom title of t to "${safeTitle}"`)
+      lines.push(`  set title displays custom title of t to true`)
+      lines.push(`  set title displays shell path of t to false`)
+      lines.push(`  set title displays window size of t to false`)
+      lines.push(`  set title displays device name of t to false`)
+      lines.push(`  set title displays file name of t to false`)
     }
     lines.push('end tell')
     await execa('osascript', lines.flatMap((l) => ['-e', l]))
@@ -48,17 +161,17 @@ async function openTerminalRunning(shellCmd: string, windowTitle?: string): Prom
 
 /**
  * Close all Terminal.app windows and Cursor windows associated with a given agent.
- * Terminal windows are matched by custom title ("AgentForge: <name>") or by
- * having the worktree path in the window name/tty.
- * Cursor windows are closed by telling the Cursor app to close windows whose
- * name contains the worktree folder name.
- * Best-effort: failures are logged but not surfaced.
+ * Also kills any matching tmux sessions.
  */
 export async function closeAgentWindows(agentName: string, worktreePath: string): Promise<void> {
   try {
     const { execa } = await import('execa')
     const safeName = agentName.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
     const safePath = worktreePath.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+
+    // Kill matching tmux session
+    const session = tmuxSessionName(agentName)
+    await execa('tmux', ['kill-session', '-t', session]).catch(() => {})
 
     // Close matching Terminal.app windows
     const terminalScript = [
@@ -82,7 +195,7 @@ export async function closeAgentWindows(agentName: string, worktreePath: string)
       logger.warn(`closeAgentWindows: Terminal close failed: ${e instanceof Error ? e.message : e}`)
     })
 
-    // Close matching Cursor windows (Cursor is an Electron app; its window name contains the folder)
+    // Close matching Cursor windows
     const folderName = worktreePath.split('/').pop() ?? ''
     if (folderName) {
       const safeFolderName = folderName.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
@@ -150,9 +263,15 @@ export async function openAgent(
     }
 
     case 'claude': {
-      const cmd = `cd ${shellSingleQuote(worktreePath)} && claude`
+      const scriptPath = writeLaunchScript({
+        agentName: options?.agentName ?? path.basename(worktreePath),
+        worktreePath,
+        claudeCmd: 'claude --continue || claude',
+        branchName: options?.branchName,
+        prNumber: options?.prNumber,
+      })
       const title = options?.agentName ? `AgentForge: ${options.agentName}` : undefined
-      const success = await openTerminalRunning(cmd, title)
+      const success = await openTerminalRunning(shellSingleQuote(scriptPath), title)
       if (!success) {
         return { ok: false, code: 'TERMINAL_FAILED', message: 'Failed to open Terminal.app with claude' }
       }
@@ -166,14 +285,16 @@ export async function openAgent(
         return { ok: false, code: 'NO_MODEL', message: 'Ollama model is required. Set it in Settings.' }
       }
       const baseUrl = options?.ollamaBaseUrl ?? 'http://localhost:11434'
-      const parts = [
-        `cd ${shellSingleQuote(worktreePath)}`,
-        `export ANTHROPIC_BASE_URL=${shellSingleQuote(baseUrl)}`,
-        `claude --model ${shellSingleQuote(model)}`,
-      ]
-      const cmd = parts.join(' && ')
+      const claudeCmd = `ANTHROPIC_BASE_URL=${shellSingleQuote(baseUrl)} claude --continue --model ${shellSingleQuote(model)} || ANTHROPIC_BASE_URL=${shellSingleQuote(baseUrl)} claude --model ${shellSingleQuote(model)}`
+      const scriptPath = writeLaunchScript({
+        agentName: options?.agentName ?? path.basename(worktreePath),
+        worktreePath,
+        claudeCmd,
+        branchName: options?.branchName,
+        prNumber: options?.prNumber,
+      })
       const title = options?.agentName ? `AgentForge: ${options.agentName}` : undefined
-      const success = await openTerminalRunning(cmd, title)
+      const success = await openTerminalRunning(shellSingleQuote(scriptPath), title)
       if (!success) {
         return { ok: false, code: 'TERMINAL_FAILED', message: 'Failed to open Terminal.app with claude + Ollama' }
       }
@@ -182,7 +303,8 @@ export async function openAgent(
     }
 
     case 'terminal': {
-      const cmd = `cd ${shellSingleQuote(worktreePath)}`
+      const banner = options?.agentName ? `${shellBanner(options.agentName)} && ` : ''
+      const cmd = `${banner}cd ${shellSingleQuote(worktreePath)}`
       const title = options?.agentName ? `AgentForge: ${options.agentName}` : undefined
       const success = await openTerminalRunning(cmd, title)
       if (!success) {

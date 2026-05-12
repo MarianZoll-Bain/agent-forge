@@ -1,6 +1,6 @@
 /**
- * Window tiler service — finds Terminal.app windows tagged with "AgentForge:"
- * and tiles them side-by-side on the current screen using JXA (osascript).
+ * Window tiler service — tiles all Terminal.app windows side-by-side
+ * on the current screen using JXA (osascript).
  */
 
 import { logger } from '../logger'
@@ -25,26 +25,32 @@ function run() {
   const terminal = Application('Terminal');
   terminal.activate();
 
-  // Match windows explicitly tagged "AgentForge:" OR whose front process is claude CLI.
-  // The Terminal window name format is: "<dir> — <title> — <process> ◂ claude …"
-  // We check for "◂ claude" to avoid matching windows just running npm/node.
-  const wins = terminal.windows().filter(w => {
-    try {
-      const ct = w.customTitle();
-      if (ct.startsWith('AgentForge:')) return true;
-      const name = w.name();
-      return /◂\\s*claude/i.test(name);
-    } catch(e) { return false; }
+  // Collect all visible Terminal windows.
+  const allWins = terminal.windows().filter(w => {
+    try { return w.visible(); } catch(e) { return false; }
   });
 
-  // Sort by custom title so the left-to-right order is deterministic across runs.
-  wins.sort((a, b) => {
-    try {
-      const ta = a.customTitle() || a.name() || '';
-      const tb = b.customTitle() || b.name() || '';
-      return ta.localeCompare(tb);
-    } catch(e) { return 0; }
+  // Sort by window id (stable, assigned at creation time) so the
+  // left-to-right order never jumps between tile operations.
+  allWins.sort((a, b) => {
+    try { return a.id() - b.id(); }
+    catch(e) { return 0; }
   });
+
+  // Deduplicate tabbed windows: tabs share the exact same bounds,
+  // so keep only the first window per unique position.
+  const seen = new Set();
+  const wins = [];
+  for (const w of allWins) {
+    try {
+      const b = w.bounds();
+      const key = Math.round(b.x) + ',' + Math.round(b.y) + ',' + Math.round(b.width) + ',' + Math.round(b.height);
+      if (!seen.has(key)) {
+        seen.add(key);
+        wins.push(w);
+      }
+    } catch(e) { /* skip */ }
+  }
 
   const count = wins.length;
   if (count === 0) return JSON.stringify({ ok: true, tiledCount: 0 });

@@ -359,10 +359,20 @@ async function handleAgentOpen(
   if (!agent) return { ok: false, code: 'AGENT_NOT_FOUND', message: `Agent ${agentId} not found` }
 
   logger.info(`agent:open agentId=${agentId} tool=${tool}`)
+
+  // Best-effort PR number lookup for the tmux status bar
+  let prNumber: number | undefined
+  try {
+    const pr = await getPRStatus(agent.worktreePath, agent.branchName)
+    if (pr.ok && pr.hasPR) prNumber = pr.prNumber
+  } catch { /* non-fatal */ }
+
   return openAgent(tool, agent.worktreePath, {
     ollamaModel: state.settings.ollamaModel,
     ollamaBaseUrl: state.settings.ollamaBaseUrl,
     agentName: agent.name,
+    branchName: agent.branchName,
+    prNumber,
   })
 }
 
