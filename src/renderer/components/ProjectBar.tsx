@@ -21,31 +21,15 @@ const TOOL_LABELS: Record<Tool, string> = {
 
 export function ProjectBar() {
   const repoName = useAppStore((s) => s.repoName())
-  const refreshState = useAppStore((s) => s.refreshState)
   const pullMain = useAppStore((s) => s.pullMain)
   const pullingMain = useAppStore((s) => s.pullingMain)
   const baseBranch = useAppStore((s) => s.state?.settings.baseBranch || 'main')
   const settings = useAppStore((s) => s.state?.settings)
-  const [switching, setSwitching] = useState(false)
   const [openBusy, setOpenBusy] = useState<Tool | null>(null)
   const [tiling, setTiling] = useState(false)
   const [tileToast, setTileToast] = useState<string | null>(null)
 
   if (!repoName) return null
-
-  async function handleSwitchProject() {
-    const api = window.agentForge
-    if (!api || switching) return
-    setSwitching(true)
-    try {
-      const result = await api.selectRepository()
-      if (result.ok) {
-        await refreshState()
-      }
-    } finally {
-      setSwitching(false)
-    }
-  }
 
   async function handleOpenTool(tool: Tool) {
     const api = window.agentForge
@@ -154,14 +138,6 @@ export function ProjectBar() {
             </svg>
           )}
           {pullingMain ? 'Pulling...' : `Update ${baseBranch}`}
-        </button>
-        <button
-          type="button"
-          onClick={handleSwitchProject}
-          disabled={switching}
-          className="text-xs font-semibold px-3 py-1 rounded-lg text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 disabled:opacity-50 transition-colors"
-        >
-          {switching ? 'Switching...' : 'Switch'}
         </button>
       </div>
     </div>

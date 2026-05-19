@@ -12,7 +12,7 @@ import { ToastContainer } from './components/Toast'
 import { ErrorBoundary } from './components/ErrorBoundary'
 
 export default function App() {
-  const { setState, setLoadError, setPermissionWarning, setAppVersion, setUpdateStatus, addToast, hasRepo, showOnboarding, setShowOnboarding, applyTheme } = useAppStore()
+  const { setState, setLoadError, setPermissionWarning, setAppVersion, setUpdateStatus, addToast, showOnboarding, setShowOnboarding, applyTheme } = useAppStore()
   const state = useAppStore((s) => s.state)
   const permissionWarning = useAppStore((s) => s.permissionWarning)
   const [initialized, setInitialized] = useState(false)
@@ -122,7 +122,7 @@ export default function App() {
     )
   }
 
-  if (!hasRepo()) {
+  if (!state?.projects?.length) {
     return (
       <ErrorBoundary>
         <SelectRepository />

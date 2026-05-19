@@ -21,10 +21,20 @@ import type {
   ToolsVerifyPayload,
   AgentPRStatusPayload,
   AgentPullPayload,
+  ProjectRemovePayload,
+  ProjectSwitchPayload,
+  ProjectReorderPayload,
 } from '../shared/ipc-channels'
 
 const api = {
   selectRepository: () => ipcRenderer.invoke('repo:select'),
+  addProject: () => ipcRenderer.invoke('project:add'),
+  removeProject: (payload: ProjectRemovePayload) =>
+    ipcRenderer.invoke('project:remove', payload),
+  switchProject: (payload: ProjectSwitchPayload) =>
+    ipcRenderer.invoke('project:switch', payload),
+  reorderProjects: (payload: ProjectReorderPayload) =>
+    ipcRenderer.invoke('project:reorder', payload),
   pullRepo: (payload: RepoPullPayload) =>
     ipcRenderer.invoke('repo:pull', payload),
   pullAgent: (payload: AgentPullPayload) =>

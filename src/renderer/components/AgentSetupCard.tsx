@@ -21,7 +21,7 @@ function suggestBranch(name: string): string {
 
 export function AgentSetupCard({ draftId }: Props) {
   const { removeDraftAgent, refreshState } = useAppStore()
-  const hasRootEnvFile = useAppStore((s) => s.state?.hasRootEnvFile ?? false)
+  const hasRootEnvFile = useAppStore((s) => s.currentProject()?.hasRootEnvFile ?? false)
 
   const [branchMode, setBranchMode] = useState<BranchMode>('new')
   const [nameInput, setNameInput] = useState('')

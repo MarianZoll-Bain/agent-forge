@@ -25,7 +25,7 @@ export function SelectRepository() {
     setErrorCode(null)
     setLoadError(null)
     try {
-      const result = await api.selectRepository()
+      const result = await api.addProject()
       if (result.ok) {
         await refreshState()
       } else {

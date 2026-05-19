@@ -9,8 +9,9 @@
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { homedir } from 'node:os'
-import type { Agent, AppState, Settings } from '../../shared/types'
+import type { Agent, AppState, Project, Settings } from '../../shared/types'
 import { CURRENT_STATE_VERSION, DEFAULT_SETTINGS } from '../../shared/types'
+import { randomUUID } from 'node:crypto'
 import { isPermissionError, getPermissionGuidance } from './permissionCheck'
 
 const STATE_DIR = '.agent-forge'
@@ -60,48 +61,42 @@ export interface LoadStateError {
 
 export type LoadStateResponse = LoadStateResult | LoadStateError
 
-export function defaultState(repoPath?: string, worktreesRootPath?: string): AppState {
+export function defaultState(): AppState {
   return {
     version: CURRENT_STATE_VERSION,
-    repoPath: repoPath ?? '',
-    worktreesRootPath: worktreesRootPath ?? '',
-    agentsMdPath: null,
-    agentsMdContents: null,
-    agents: [],
+    projects: [],
+    currentProjectId: null,
     settings: { ...DEFAULT_SETTINGS },
     lastUpdated: new Date().toISOString(),
   }
 }
 
-/**
- * Migrate old state to current schema.
- * v0→v1: ensure base fields
- * v1→v2: strip execution fields from agents and settings
- */
-function migrate(state: Record<string, unknown>): AppState {
-  const version = typeof state.version === 'number' ? state.version : 0
-  if (version > CURRENT_STATE_VERSION) {
-    throw new Error(`Unknown state version: ${version}`)
+/** Get the active project from state. */
+export function getActiveProject(state: AppState): Project | undefined {
+  if (!state.currentProjectId) return undefined
+  return state.projects.find((p) => p.id === state.currentProjectId)
+}
+
+/** Find which project an agent belongs to (searches all projects). */
+export function findAgentProject(state: AppState, agentId: string): { project: Project; agent: Agent } | undefined {
+  for (const project of state.projects) {
+    const agent = project.agents.find((a) => a.id === agentId)
+    if (agent) return { project, agent }
   }
+  return undefined
+}
 
-  // Build base state from disk
-  const rawAgents = Array.isArray(state.agents) ? state.agents : []
-  const rawSettings = state.settings && typeof state.settings === 'object'
-    ? (state.settings as Record<string, unknown>)
-    : {}
+/** Update a specific project within the state. */
+export function updateProject(state: AppState, projectId: string, updater: (p: Project) => Project): AppState {
+  return {
+    ...state,
+    projects: state.projects.map((p) => (p.id === projectId ? updater(p) : p)),
+  }
+}
 
-  // v1→v2: Strip execution fields from agents; v2→v3: jiraKey→name
-  const agents: Agent[] = rawAgents.map((a: Record<string, unknown>) => ({
-    id: typeof a.id === 'string' ? a.id : '',
-    name: typeof a.name === 'string' ? a.name : (typeof a.jiraKey === 'string' ? a.jiraKey : ''),
-    branchName: typeof a.branchName === 'string' ? a.branchName : '',
-    baseBranch: typeof a.baseBranch === 'string' ? a.baseBranch : 'main',
-    worktreePath: typeof a.worktreePath === 'string' ? a.worktreePath : '',
-    createdAt: typeof a.createdAt === 'string' ? a.createdAt : new Date().toISOString(),
-  }))
-
-  // v1→v2: Strip execution settings; v2→v3: remove jiraBaseUrl, add tool enablement
-  const settings: Settings = {
+/** Parse raw settings from any version into a clean Settings object. */
+function migrateSettings(rawSettings: Record<string, unknown>): Settings {
+  return {
     ...(typeof rawSettings.baseBranch === 'string' ? { baseBranch: rawSettings.baseBranch } : {}),
     ...(typeof rawSettings.worktreesDirName === 'string' ? { worktreesDirName: rawSettings.worktreesDirName } : {}),
     ...(typeof rawSettings.ollamaModel === 'string' ? { ollamaModel: rawSettings.ollamaModel } : {}),
@@ -113,36 +108,126 @@ function migrate(state: Record<string, unknown>): AppState {
     ...(typeof rawSettings.onboardingComplete === 'boolean' ? { onboardingComplete: rawSettings.onboardingComplete } : {}),
     ...(typeof rawSettings.enableGitMode === 'boolean' ? { enableGitMode: rawSettings.enableGitMode } : {}),
   }
+}
 
-  return {
-    version: CURRENT_STATE_VERSION,
-    repoPath: typeof state.repoPath === 'string' ? state.repoPath : '',
-    worktreesRootPath: typeof state.worktreesRootPath === 'string' ? state.worktreesRootPath : '',
-    agentsMdPath: state.agentsMdPath != null ? String(state.agentsMdPath) : null,
-    agentsMdContents: state.agentsMdContents != null ? String(state.agentsMdContents) : null,
-    agents,
-    settings: { ...DEFAULT_SETTINGS, ...settings },
-    lastUpdated: typeof state.lastUpdated === 'string' ? state.lastUpdated : new Date().toISOString(),
-  }
+/** Parse raw agents array from any version into clean Agent[]. */
+function migrateAgents(rawAgents: unknown[]): Agent[] {
+  return rawAgents.map((a: Record<string, unknown>) => ({
+    id: typeof a.id === 'string' ? a.id : '',
+    name: typeof a.name === 'string' ? a.name : (typeof a.jiraKey === 'string' ? a.jiraKey : ''),
+    branchName: typeof a.branchName === 'string' ? a.branchName : '',
+    baseBranch: typeof a.baseBranch === 'string' ? a.baseBranch : 'main',
+    worktreePath: typeof a.worktreePath === 'string' ? a.worktreePath : '',
+    createdAt: typeof a.createdAt === 'string' ? a.createdAt : new Date().toISOString(),
+  }))
 }
 
 /**
- * Validate agent worktree paths after loading.
- * Agents whose worktreePath is missing are filtered out.
+ * Migrate old state to current schema.
+ * v0→v1: ensure base fields
+ * v1→v2: strip execution fields from agents and settings
+ * v2→v3: jiraKey→name
+ * v3→v4: single-repo → multi-project
  */
-function validateAgentWorktrees(state: AppState): AppState {
-  const agents = state.agents.filter((agent) => {
+function migrate(state: Record<string, unknown>): AppState {
+  const version = typeof state.version === 'number' ? state.version : 0
+  if (version > CURRENT_STATE_VERSION) {
+    throw new Error(`Unknown state version: ${version}`)
+  }
+
+  const rawSettings = state.settings && typeof state.settings === 'object'
+    ? (state.settings as Record<string, unknown>)
+    : {}
+  const settings: Settings = { ...DEFAULT_SETTINGS, ...migrateSettings(rawSettings) }
+  const lastUpdated = typeof state.lastUpdated === 'string' ? state.lastUpdated : new Date().toISOString()
+
+  // v4+: already multi-project format
+  if (version >= 4 && Array.isArray(state.projects)) {
+    const projects: Project[] = (state.projects as Record<string, unknown>[]).map((p) => ({
+      id: typeof p.id === 'string' ? p.id : randomUUID(),
+      repoPath: typeof p.repoPath === 'string' ? p.repoPath : '',
+      worktreesRootPath: typeof p.worktreesRootPath === 'string' ? p.worktreesRootPath : '',
+      agentsMdPath: p.agentsMdPath != null ? String(p.agentsMdPath) : null,
+      agentsMdContents: p.agentsMdContents != null ? String(p.agentsMdContents) : null,
+      agents: Array.isArray(p.agents) ? migrateAgents(p.agents as unknown[]) : [],
+      hasRootEnvFile: typeof p.hasRootEnvFile === 'boolean' ? p.hasRootEnvFile : undefined,
+      colorIndex: typeof p.colorIndex === 'number' ? p.colorIndex : undefined,
+    }))
+    // Backfill missing colorIndex values with sequential indices
+    const usedColors = new Set(projects.filter((p) => p.colorIndex != null).map((p) => p.colorIndex!))
+    for (const p of projects) {
+      if (p.colorIndex == null) {
+        let idx = 0
+        while (usedColors.has(idx)) idx++
+        p.colorIndex = idx
+        usedColors.add(idx)
+      }
+    }
+    return {
+      version: CURRENT_STATE_VERSION,
+      projects,
+      currentProjectId: typeof state.currentProjectId === 'string' ? state.currentProjectId : null,
+      settings,
+      lastUpdated,
+    }
+  }
+
+  // v0–v3: single-repo format → wrap into a project
+  const rawAgents = Array.isArray(state.agents) ? state.agents : []
+  const agents = migrateAgents(rawAgents)
+  const repoPath = typeof state.repoPath === 'string' ? state.repoPath : ''
+
+  const projects: Project[] = []
+  let currentProjectId: string | null = null
+
+  if (repoPath) {
+    const projectId = randomUUID()
+    projects.push({
+      id: projectId,
+      repoPath,
+      worktreesRootPath: typeof state.worktreesRootPath === 'string' ? state.worktreesRootPath : '',
+      agentsMdPath: state.agentsMdPath != null ? String(state.agentsMdPath) : null,
+      agentsMdContents: state.agentsMdContents != null ? String(state.agentsMdContents) : null,
+      agents,
+      colorIndex: 0,
+    })
+    currentProjectId = projectId
+  }
+
+  return {
+    version: CURRENT_STATE_VERSION,
+    projects,
+    currentProjectId,
+    settings,
+    lastUpdated,
+  }
+}
+
+/** Filter out agents whose worktreePath no longer exists on disk. */
+function filterValidAgents(agents: Agent[]): Agent[] {
+  return agents.filter((agent) => {
     if (!agent.worktreePath) return false
     try {
       return fs.existsSync(agent.worktreePath) && fs.statSync(agent.worktreePath).isDirectory()
     } catch (e: unknown) {
-      // Keep the agent in state if the error is a permission denial — the worktree
-      // likely still exists but the OS is blocking access (e.g. macOS TCC).
       if (isPermissionError(e)) return true
       return false
     }
   })
-  return { ...state, agents }
+}
+
+/**
+ * Validate agent worktree paths for all projects after loading.
+ * Agents whose worktreePath is missing are filtered out.
+ */
+function validateAgentWorktrees(state: AppState): AppState {
+  return {
+    ...state,
+    projects: state.projects.map((p) => ({
+      ...p,
+      agents: filterValidAgents(p.agents),
+    })),
+  }
 }
 
 /**
@@ -156,29 +241,38 @@ export function loadState(): LoadStateResponse {
     const parsed = JSON.parse(raw) as Record<string, unknown>
     let state = migrate(parsed)
     let warning: StateWarning | undefined
-    if (state.repoPath) {
+
+    // Validate each project's repoPath; remove projects whose repos no longer exist
+    const validProjects: Project[] = []
+    for (const project of state.projects) {
+      if (!project.repoPath) continue
       try {
-        if (!fs.existsSync(state.repoPath) || !fs.statSync(state.repoPath).isDirectory()) {
-          state = defaultState()
-          saveState(state)
+        if (fs.existsSync(project.repoPath) && fs.statSync(project.repoPath).isDirectory()) {
+          validProjects.push(project)
         }
       } catch (e: unknown) {
         if (isPermissionError(e)) {
-          // Keep state intact — the repo probably still exists but macOS is blocking access
-          const guidance = getPermissionGuidance(state.repoPath)
+          // Keep — likely still exists but macOS TCC is blocking
+          validProjects.push(project)
+          const guidance = getPermissionGuidance(project.repoPath)
           warning = {
             code: 'PERMISSION_DENIED',
             message: guidance ?? (
-              'Permission denied when accessing the repository folder. ' +
+              'Permission denied when accessing a repository folder. ' +
               'Check System Settings > Privacy & Security > Files and Folders.'
             ),
           }
-        } else {
-          state = defaultState()
-          saveState(state)
         }
+        // else: skip this project (repo gone)
       }
     }
+    state = { ...state, projects: validProjects }
+
+    // Fix currentProjectId if it no longer points to a valid project
+    if (state.currentProjectId && !state.projects.find((p) => p.id === state.currentProjectId)) {
+      state = { ...state, currentProjectId: state.projects[0]?.id ?? null }
+    }
+
     state = validateAgentWorktrees(state)
     return { ok: true, state, warning }
   } catch (e: unknown) {

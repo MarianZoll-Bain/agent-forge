@@ -343,6 +343,82 @@ export interface PromptsChangeScopeError {
 
 export type PromptsChangeScopeResponse = PromptsChangeScopeResult | PromptsChangeScopeError
 
+// ---- Project management channels ----
+
+/** Add a new project (open folder dialog, validate, add tab) */
+export const PROJECT_ADD = 'project:add' as const
+/** Remove a project tab by ID */
+export const PROJECT_REMOVE = 'project:remove' as const
+/** Switch to a different project tab */
+export const PROJECT_SWITCH = 'project:switch' as const
+
+export interface ProjectRemovePayload {
+  projectId: string
+}
+
+export interface ProjectSwitchPayload {
+  projectId: string
+}
+
+export interface ProjectAddResult {
+  ok: true
+  state: import('./types').AppState
+}
+
+export interface ProjectAddError {
+  ok: false
+  code: string
+  message: string
+}
+
+export type ProjectAddResponse = ProjectAddResult | ProjectAddError
+
+export interface ProjectRemoveResult {
+  ok: true
+  state: import('./types').AppState
+}
+
+export interface ProjectRemoveError {
+  ok: false
+  code: string
+  message: string
+}
+
+export type ProjectRemoveResponse = ProjectRemoveResult | ProjectRemoveError
+
+export interface ProjectSwitchResult {
+  ok: true
+  state: import('./types').AppState
+}
+
+export interface ProjectSwitchError {
+  ok: false
+  code: string
+  message: string
+}
+
+export type ProjectSwitchResponse = ProjectSwitchResult | ProjectSwitchError
+
+/** Reorder project tabs */
+export const PROJECT_REORDER = 'project:reorder' as const
+
+export interface ProjectReorderPayload {
+  projectIds: string[]
+}
+
+export interface ProjectReorderResult {
+  ok: true
+  state: import('./types').AppState
+}
+
+export interface ProjectReorderError {
+  ok: false
+  code: string
+  message: string
+}
+
+export type ProjectReorderResponse = ProjectReorderResult | ProjectReorderError
+
 // ---- Tool verification + App reset ----
 
 /** Verify a tool binary is available and return its version */
@@ -451,6 +527,10 @@ export interface AppVersionResponse {
 
 export type PreloadAPI = {
   selectRepository: () => Promise<RepoSelectResponse>
+  addProject: () => Promise<ProjectAddResponse>
+  removeProject: (payload: ProjectRemovePayload) => Promise<ProjectRemoveResponse>
+  switchProject: (payload: ProjectSwitchPayload) => Promise<ProjectSwitchResponse>
+  reorderProjects: (payload: ProjectReorderPayload) => Promise<ProjectReorderResponse>
   pullRepo: (payload: RepoPullPayload) => Promise<RepoPullResponse>
   pullAgent: (payload: AgentPullPayload) => Promise<AgentPullResponse>
   getState: () => Promise<StateGetResponse>

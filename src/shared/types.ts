@@ -3,17 +3,42 @@
  * Simplified: worktree management + native opener. No embedded agent execution.
  */
 
-export interface AppState {
-  version: number
+export type ProjectId = string
+
+/** Project color palette — indices map to tmux and UI colors. */
+export const PROJECT_COLORS = [
+  { name: 'Indigo',  tmux: 'colour63',  css: '#6366f1', bg: '#151520' },
+  { name: 'Emerald', tmux: 'colour35',  css: '#10b981', bg: '#131e16' },
+  { name: 'Amber',   tmux: 'colour172', css: '#f59e0b', bg: '#1a1813' },
+  { name: 'Rose',    tmux: 'colour161', css: '#f43f5e', bg: '#1a1316' },
+  { name: 'Cyan',    tmux: 'colour37',  css: '#06b6d4', bg: '#13191c' },
+  { name: 'Violet',  tmux: 'colour128', css: '#8b5cf6', bg: '#18131f' },
+  { name: 'Orange',  tmux: 'colour208', css: '#f97316', bg: '#1a1613' },
+  { name: 'Teal',    tmux: 'colour30',  css: '#14b8a6', bg: '#131c1a' },
+  { name: 'Pink',    tmux: 'colour198', css: '#ec4899', bg: '#1a1318' },
+  { name: 'Blue',    tmux: 'colour33',  css: '#3b82f6', bg: '#13161e' },
+] as const
+
+/** Per-project state: repo info + its agents. */
+export interface Project {
+  id: ProjectId
   repoPath: string
   worktreesRootPath: string
   agentsMdPath: string | null
   agentsMdContents: string | null
   agents: Agent[]
+  /** Whether this project's repo has a .env file at its root. */
+  hasRootEnvFile?: boolean
+  /** Index into PROJECT_COLORS palette (0–9). Auto-assigned on creation. */
+  colorIndex?: number
+}
+
+export interface AppState {
+  version: number
+  projects: Project[]
+  currentProjectId: ProjectId | null
   settings: Settings
   lastUpdated?: string
-  /** Whether the currently selected repo has a .env file at its root. */
-  hasRootEnvFile?: boolean
 }
 
 export interface Agent {
@@ -46,7 +71,7 @@ export interface Settings {
   enableGitMode?: boolean
 }
 
-export const CURRENT_STATE_VERSION = 3
+export const CURRENT_STATE_VERSION = 4
 
 export const DEFAULT_SETTINGS: Settings = {}
 

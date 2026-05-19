@@ -4,7 +4,7 @@
  */
 
 import { create } from 'zustand'
-import type { AppState, PromptEntry, UpdateStatus } from '@shared/types'
+import type { AppState, Project, PromptEntry, UpdateStatus } from '@shared/types'
 import type { AgentGitStatusResult, AgentPRStatusResult } from '@shared/ipc-channels'
 
 /** Toast auto-dismiss delay in ms. */
@@ -77,14 +77,14 @@ interface AppStoreState {
   removePromptFromList: (id: string) => void
   addPromptToList: (prompt: PromptEntry) => void
 
-  /** Refresh git + PR status for all agents at once. */
+  /** Refresh git + PR status for all agents in the active project. */
   refreshAllStatuses: () => Promise<void>
   /** True while a bulk refresh is in progress. */
   refreshingAllStatuses: boolean
   /** Agent IDs currently being refreshed by the bulk action. */
   agentRefreshingIds: Set<string>
 
-  /** Pull latest changes on root repo's main branch. */
+  /** Pull latest changes on active project's main branch. */
   pullMain: () => Promise<void>
   /** True while pulling main branch. */
   pullingMain: boolean
@@ -94,9 +94,18 @@ interface AppStoreState {
   /** Cycle dark mode: undefined→true→false→undefined (system→dark→light→system). */
   toggleDarkMode: () => void
 
+  // Project-aware derived helpers
+  currentProject: () => Project | undefined
+  hasAnyProject: () => boolean
   hasRepo: () => boolean
   repoName: () => string
   repoPath: () => string
+
+  // Project tab actions
+  addProject: () => Promise<void>
+  removeProject: (projectId: string) => Promise<void>
+  switchProject: (projectId: string) => Promise<void>
+  reorderProjects: (projectIds: string[]) => Promise<void>
 }
 
 /** Resolve the effective theme from a darkMode setting value. */
@@ -182,7 +191,8 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
   refreshAllStatuses: async () => {
     const api = window.agentForge
     if (!api) return
-    const agents = get().state?.agents ?? []
+    const project = get().currentProject()
+    const agents = project?.agents ?? []
     if (agents.length === 0) return
     const enableGitMode = get().state?.settings.enableGitMode
     const allIds = new Set(agents.map((a) => a.id))
@@ -326,16 +336,62 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
     set({ resolvedTheme: resolved })
   },
 
-  hasRepo: () => !!(get().state?.repoPath),
+  // Project-aware derived helpers
+  currentProject: () => {
+    const s = get().state
+    if (!s?.currentProjectId) return undefined
+    return s.projects.find((p) => p.id === s.currentProjectId)
+  },
+
+  hasAnyProject: () => (get().state?.projects.length ?? 0) > 0,
+
+  hasRepo: () => !!get().currentProject()?.repoPath,
 
   repoName: () => {
-    const s = get().state
-    if (!s?.repoPath) return ''
-    const parts = s.repoPath.replace(/\/$/, '').split('/')
+    const project = get().currentProject()
+    if (!project?.repoPath) return ''
+    const parts = project.repoPath.replace(/\/$/, '').split('/')
     return parts[parts.length - 1] ?? ''
   },
 
-  repoPath: () => get().state?.repoPath ?? '',
+  repoPath: () => get().currentProject()?.repoPath ?? '',
+
+  // Project tab actions
+  addProject: async () => {
+    const api = window.agentForge
+    if (!api) return
+    const result = await api.addProject()
+    if (result.ok) {
+      set({ state: result.state, loadError: null, draftAgents: [] })
+    }
+  },
+
+  removeProject: async (projectId: string) => {
+    const api = window.agentForge
+    if (!api) return
+    const result = await api.removeProject({ projectId })
+    if (result.ok) {
+      set({ state: result.state, loadError: null, draftAgents: [] })
+    }
+  },
+
+  switchProject: async (projectId: string) => {
+    const api = window.agentForge
+    if (!api) return
+    const result = await api.switchProject({ projectId })
+    if (result.ok) {
+      set({ state: result.state, loadError: null, draftAgents: [] })
+    }
+  },
+
+  reorderProjects: async (projectIds: string[]) => {
+    const api = window.agentForge
+    if (!api) return
+    const result = await api.reorderProjects({ projectIds })
+    if (result.ok) {
+      set({ state: result.state, loadError: null })
+    }
+  },
 }))
 
 // Listen for OS theme changes — update when darkMode is undefined (system)

@@ -325,20 +325,22 @@ export function AgentCard({ agent, onRemove }: AgentCardProps) {
           setRemoveBusy(false)
           return
         }
+        // Agent was removed from state. If worktree deletion failed, warn via toast
+        // but still close the dialog — the agent entry is already gone.
         if (result.worktreeRemoveError) {
-          setRemoveError(`Agent removed but worktree deletion failed: ${result.worktreeRemoveError}`)
-          setRemoveBusy(false)
-          return
+          addToast(`Worktree deletion failed: ${result.worktreeRemoveError}`, 'error')
         }
-        // Mark as removed so no further state updates happen on this card.
-        // Keep dialog open (busy) until parent finishes refreshing state.
         removedRef.current = true
         await onRemove(agent.id)
+        // Dialog stays busy (spinner) until the card unmounts from parent refresh
       } catch {
-        if (!removedRef.current) setRemoveBusy(false)
+        if (!removedRef.current) {
+          setRemoveError('Unexpected error during removal')
+          setRemoveBusy(false)
+        }
       }
     },
-    [agent.id, onRemove],
+    [agent.id, onRemove, addToast],
   )
 
   return (

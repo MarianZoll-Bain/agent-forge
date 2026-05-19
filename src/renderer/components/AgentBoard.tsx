@@ -8,7 +8,7 @@ import { AgentSetupCard } from './AgentSetupCard'
 import { useAppStore } from '../store/useAppStore'
 
 export function AgentBoard() {
-  const agents = useAppStore((s) => s.state?.agents ?? [])
+  const agents = useAppStore((s) => s.currentProject()?.agents ?? [])
   const draftAgents = useAppStore((s) => s.draftAgents)
   const addDraftAgent = useAppStore((s) => s.addDraftAgent)
   const refreshState = useAppStore((s) => s.refreshState)
@@ -35,7 +35,7 @@ export function AgentBoard() {
 
       <div className="flex-1 min-h-0 rounded-2xl border border-slate-200/80 dark:border-white/[0.06] bg-white/60 dark:bg-white/[0.02] overflow-auto">
         {isEmpty ? (
-          <EmptyState />
+          <EmptyState onAdd={addDraftAgent} />
         ) : (
           <div className="p-5">
             <div className="flex justify-end gap-2 mb-4">

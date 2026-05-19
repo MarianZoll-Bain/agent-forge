@@ -5,13 +5,14 @@
 
 import * as fs from 'node:fs'
 import * as path from 'node:path'
+import { randomUUID } from 'node:crypto'
 import { ipcMain, shell } from 'electron'
 import type { BrowserWindow } from 'electron'
 import { z } from 'zod'
 import { validateRepoPath } from './services/repoValidator'
 import { ensureWorktreesDirectory } from './services/worktreeManager'
 import { readAgentsMd } from './services/agentsMdReader'
-import { loadState, saveState } from './services/stateManager'
+import { loadState, saveState, defaultState, getActiveProject, findAgentProject, updateProject } from './services/stateManager'
 import { validateBranchName } from './services/gitValidator'
 import { createWorktreeForAgent, discoverExistingWorktrees, listRepoBranches, listRepoPRs } from './services/agentService'
 import { getGitStatus } from './services/gitStatusService'
@@ -45,9 +46,13 @@ import type {
   GitListBranchesResponse,
   GitListPRsResponse,
   WindowTileResponse,
+  ProjectAddResponse,
+  ProjectRemoveResponse,
+  ProjectSwitchResponse,
+  ProjectReorderResponse,
 } from '../shared/ipc-channels'
-import type { AppState } from '../shared/types'
-import { defaultState } from './services/stateManager'
+import type { AppState, Project } from '../shared/types'
+import { PROJECT_COLORS } from '../shared/types'
 import { logger } from './logger'
 
 let mainWindowRef: BrowserWindow | null = null
@@ -61,39 +66,36 @@ function isSenderAllowed(event: Electron.IpcMainInvokeEvent): boolean {
   return event.sender === mainWindowRef.webContents
 }
 
-async function handleSelectRepository(event: Electron.IpcMainInvokeEvent): Promise<RepoSelectResponse> {
-  logger.info('repo:select invoked')
-  if (!isSenderAllowed(event)) {
-    logger.warn('repo:select rejected: invalid sender')
-    return { ok: false, code: 'FORBIDDEN', message: 'Invalid sender' }
-  }
+// ---- Shared: select + validate a repo folder ----
+
+interface ValidatedRepo {
+  repoPath: string
+  repoName: string
+  worktreesRootPath: string
+  agentsMdPath: string | null
+  agentsMdContents: string | null
+  hasRootEnvFile: boolean
+}
+
+async function selectAndValidateRepo(): Promise<{ ok: true; repo: ValidatedRepo } | { ok: false; code: string; message: string }> {
   const { dialog } = await import('electron')
-  logger.debug('Opening folder dialog')
   const result = await dialog.showOpenDialog(mainWindowRef!, {
     properties: ['openDirectory'],
     title: 'Select Repository',
   })
   if (result.canceled || result.filePaths.length === 0) {
-    logger.info('repo:select canceled or no path')
     return { ok: false, code: 'CANCELED', message: 'No folder selected' }
   }
   const candidatePath = result.filePaths[0]
   logger.info('Selected path:', candidatePath)
   const validation = await validateRepoPath(candidatePath)
   if (!validation.valid) {
-    logger.warn('Validation failed:', validation.code, validation.error)
-    return {
-      ok: false,
-      code: validation.code ?? 'VALIDATION_FAILED',
-      message: validation.error ?? 'Validation failed',
-    }
+    return { ok: false, code: validation.code ?? 'VALIDATION_FAILED', message: validation.error ?? 'Validation failed' }
   }
   const repoPath = validation.repoPath!
   const repoName = validation.repoName!
-  logger.info('Valid repo:', repoPath, repoName)
   const worktreesResult = ensureWorktreesDirectory(repoPath)
   if (!worktreesResult.ok) {
-    logger.error('Worktrees dir failed:', worktreesResult.code, worktreesResult.message)
     return { ok: false, code: worktreesResult.code, message: worktreesResult.message }
   }
   const worktreesRootPath = worktreesResult.worktreesRootPath
@@ -103,19 +105,40 @@ async function handleSelectRepository(event: Electron.IpcMainInvokeEvent): Promi
   if (agentsMdResult.ok) {
     agentsMdPath = agentsMdResult.agentsMdPath
     agentsMdContents = agentsMdResult.contents
-    logger.debug('Agents.MD loaded')
   } else if (agentsMdResult.code !== 'NOT_FOUND') {
-    logger.warn('Agents.MD read error:', agentsMdResult.code, agentsMdResult.message)
     return { ok: false, code: agentsMdResult.code, message: agentsMdResult.message }
   }
-  const state = loadState()
-  const currentState: AppState = state.ok ? state.state : defaultState()
+  const hasRootEnvFile = fs.existsSync(path.join(repoPath, '.env'))
+  return { ok: true, repo: { repoPath, repoName, worktreesRootPath, agentsMdPath, agentsMdContents, hasRootEnvFile } }
+}
 
-  // Discover existing worktrees in the .worktrees directory and create agent entries
-  const existingAgents = currentState.agents.filter((a) => a.worktreePath.startsWith(worktreesRootPath))
-  let discoveredAgents: typeof currentState.agents = []
+// ---- Project handlers ----
+
+async function handleProjectAdd(event: Electron.IpcMainInvokeEvent): Promise<ProjectAddResponse> {
+  logger.info('project:add invoked')
+  if (!isSenderAllowed(event)) {
+    return { ok: false, code: 'FORBIDDEN', message: 'Invalid sender' }
+  }
+  const repoResult = await selectAndValidateRepo()
+  if (!repoResult.ok) return repoResult
+
+  const { repo } = repoResult
+  const stateResult = loadState()
+  const currentState: AppState = stateResult.ok ? stateResult.state : defaultState()
+
+  // Check if this repo is already open
+  const existing = currentState.projects.find((p) => p.repoPath === repo.repoPath)
+  if (existing) {
+    // Just switch to it
+    const newState: AppState = { ...currentState, currentProjectId: existing.id }
+    saveState(newState)
+    return { ok: true, state: newState }
+  }
+
+  // Discover existing worktrees
+  let discoveredAgents: Project['agents'] = []
   try {
-    discoveredAgents = await discoverExistingWorktrees(repoPath, worktreesRootPath, existingAgents)
+    discoveredAgents = await discoverExistingWorktrees(repo.repoPath, repo.worktreesRootPath, [])
     if (discoveredAgents.length > 0) {
       logger.info(`Discovered ${discoveredAgents.length} existing worktree(s)`)
     }
@@ -123,32 +146,186 @@ async function handleSelectRepository(event: Electron.IpcMainInvokeEvent): Promi
     logger.warn('Worktree discovery failed (non-fatal):', e instanceof Error ? e.message : e)
   }
 
-  const hasRootEnvFile = fs.existsSync(path.join(repoPath, '.env'))
+  // Pick the next unused color index
+  const usedColors = new Set(currentState.projects.map((p) => p.colorIndex ?? 0))
+  let colorIndex = 0
+  for (let i = 0; i < PROJECT_COLORS.length; i++) {
+    if (!usedColors.has(i)) { colorIndex = i; break }
+  }
+
+  const projectId = randomUUID()
+  const project: Project = {
+    id: projectId,
+    repoPath: repo.repoPath,
+    worktreesRootPath: repo.worktreesRootPath,
+    agentsMdPath: repo.agentsMdPath,
+    agentsMdContents: repo.agentsMdContents,
+    agents: discoveredAgents,
+    hasRootEnvFile: repo.hasRootEnvFile,
+    colorIndex,
+  }
 
   const newState: AppState = {
     ...currentState,
-    repoPath,
-    worktreesRootPath,
-    agentsMdPath,
-    agentsMdContents,
-    agents: [...existingAgents, ...discoveredAgents],
-    hasRootEnvFile,
+    projects: [...currentState.projects, project],
+    currentProjectId: projectId,
   }
   const saveResult = saveState(newState)
-  if (!saveResult.ok) {
-    logger.error('Save state failed:', saveResult.code, saveResult.message)
-    return { ok: false, code: saveResult.code, message: saveResult.message }
+  if (!saveResult.ok) return { ok: false, code: saveResult.code, message: saveResult.message }
+
+  logger.info(`project:add success: ${repo.repoPath}`)
+  return { ok: true, state: newState }
+}
+
+const ProjectRemoveSchema = z.object({ projectId: z.string().min(1) })
+
+async function handleProjectRemove(event: Electron.IpcMainInvokeEvent, payload: unknown): Promise<ProjectRemoveResponse> {
+  if (!isSenderAllowed(event)) {
+    return { ok: false, code: 'FORBIDDEN', message: 'Invalid sender' }
   }
-  logger.info('repo:select success:', repoPath)
+  const parsed = ProjectRemoveSchema.safeParse(payload)
+  if (!parsed.success) {
+    return { ok: false, code: 'VALIDATION_FAILED', message: 'projectId is required' }
+  }
+  const { projectId } = parsed.data
+  const stateResult = loadState()
+  if (!stateResult.ok) return { ok: false, code: stateResult.code, message: stateResult.message }
+  const state = stateResult.state
+
+  const remaining = state.projects.filter((p) => p.id !== projectId)
+  let currentProjectId = state.currentProjectId
+  if (currentProjectId === projectId) {
+    currentProjectId = remaining[0]?.id ?? null
+  }
+
+  const newState: AppState = { ...state, projects: remaining, currentProjectId }
+  const saveResult = saveState(newState)
+  if (!saveResult.ok) return { ok: false, code: saveResult.code, message: saveResult.message }
+
+  logger.info(`project:remove success: ${projectId}`)
+  return { ok: true, state: newState }
+}
+
+const ProjectSwitchSchema = z.object({ projectId: z.string().min(1) })
+
+async function handleProjectSwitch(event: Electron.IpcMainInvokeEvent, payload: unknown): Promise<ProjectSwitchResponse> {
+  if (!isSenderAllowed(event)) {
+    return { ok: false, code: 'FORBIDDEN', message: 'Invalid sender' }
+  }
+  const parsed = ProjectSwitchSchema.safeParse(payload)
+  if (!parsed.success) {
+    return { ok: false, code: 'VALIDATION_FAILED', message: 'projectId is required' }
+  }
+  const stateResult = loadState()
+  if (!stateResult.ok) return { ok: false, code: stateResult.code, message: stateResult.message }
+  const state = stateResult.state
+
+  if (!state.projects.find((p) => p.id === parsed.data.projectId)) {
+    return { ok: false, code: 'NOT_FOUND', message: 'Project not found' }
+  }
+
+  const newState: AppState = { ...state, currentProjectId: parsed.data.projectId }
+  const saveResult = saveState(newState)
+  if (!saveResult.ok) return { ok: false, code: saveResult.code, message: saveResult.message }
+
+  return { ok: true, state: newState }
+}
+
+const ProjectReorderSchema = z.object({ projectIds: z.array(z.string().min(1)).min(1) })
+
+async function handleProjectReorder(event: Electron.IpcMainInvokeEvent, payload: unknown): Promise<ProjectReorderResponse> {
+  if (!isSenderAllowed(event)) {
+    return { ok: false, code: 'FORBIDDEN', message: 'Invalid sender' }
+  }
+  const parsed = ProjectReorderSchema.safeParse(payload)
+  if (!parsed.success) {
+    return { ok: false, code: 'VALIDATION_FAILED', message: 'projectIds array is required' }
+  }
+  const stateResult = loadState()
+  if (!stateResult.ok) return { ok: false, code: stateResult.code, message: stateResult.message }
+  const state = stateResult.state
+
+  // Build reordered array: for each ID, find the project; skip unknown IDs
+  const byId = new Map(state.projects.map((p) => [p.id, p]))
+  const reordered: Project[] = []
+  for (const id of parsed.data.projectIds) {
+    const p = byId.get(id)
+    if (p) {
+      reordered.push(p)
+      byId.delete(id)
+    }
+  }
+  // Append any projects not in the list (safety net)
+  for (const p of byId.values()) reordered.push(p)
+
+  const newState: AppState = { ...state, projects: reordered }
+  const saveResult = saveState(newState)
+  if (!saveResult.ok) return { ok: false, code: saveResult.code, message: saveResult.message }
+
+  return { ok: true, state: newState }
+}
+
+// ---- Legacy repo:select (now wraps project:add logic for backward compat) ----
+
+async function handleSelectRepository(event: Electron.IpcMainInvokeEvent): Promise<RepoSelectResponse> {
+  logger.info('repo:select invoked')
+  if (!isSenderAllowed(event)) {
+    return { ok: false, code: 'FORBIDDEN', message: 'Invalid sender' }
+  }
+  const repoResult = await selectAndValidateRepo()
+  if (!repoResult.ok) return repoResult
+  const { repo } = repoResult
+
+  // Also create/switch project in state
+  const stateResult = loadState()
+  const currentState: AppState = stateResult.ok ? stateResult.state : defaultState()
+  const existing = currentState.projects.find((p) => p.repoPath === repo.repoPath)
+
+  if (existing) {
+    const newState: AppState = { ...currentState, currentProjectId: existing.id }
+    saveState(newState)
+  } else {
+    const projectId = randomUUID()
+    let discoveredAgents: Project['agents'] = []
+    try {
+      discoveredAgents = await discoverExistingWorktrees(repo.repoPath, repo.worktreesRootPath, [])
+    } catch { /* non-fatal */ }
+
+    const usedColors = new Set(currentState.projects.map((p) => p.colorIndex ?? 0))
+    let colorIndex = 0
+    for (let i = 0; i < PROJECT_COLORS.length; i++) {
+      if (!usedColors.has(i)) { colorIndex = i; break }
+    }
+
+    const project: Project = {
+      id: projectId,
+      repoPath: repo.repoPath,
+      worktreesRootPath: repo.worktreesRootPath,
+      agentsMdPath: repo.agentsMdPath,
+      agentsMdContents: repo.agentsMdContents,
+      agents: discoveredAgents,
+      hasRootEnvFile: repo.hasRootEnvFile,
+      colorIndex,
+    }
+    const newState: AppState = {
+      ...currentState,
+      projects: [...currentState.projects, project],
+      currentProjectId: projectId,
+    }
+    saveState(newState)
+  }
+
   return {
     ok: true,
-    repoPath,
-    repoName,
-    worktreesRootPath,
-    agentsMdPath,
-    agentsMdContents,
+    repoPath: repo.repoPath,
+    repoName: repo.repoName,
+    worktreesRootPath: repo.worktreesRootPath,
+    agentsMdPath: repo.agentsMdPath,
+    agentsMdContents: repo.agentsMdContents,
   } satisfies RepoSelectResult
 }
+
+// ---- State handler ----
 
 async function handleGetState(event: Electron.IpcMainInvokeEvent): Promise<StateGetResponse> {
   if (!isSenderAllowed(event)) {
@@ -158,29 +335,40 @@ async function handleGetState(event: Electron.IpcMainInvokeEvent): Promise<State
   if (!result.ok) {
     throw Object.assign(new Error(result.message), { code: result.code })
   }
-  const state = result.state
+  let state = result.state
   const warning = result.warning
 
-  // Detect .env at repo root
-  const hasRootEnvFile = state.repoPath ? fs.existsSync(path.join(state.repoPath, '.env')) : false
+  // For each project, detect .env and discover new worktrees
+  let stateChanged = false
+  const updatedProjects: Project[] = []
+  for (const project of state.projects) {
+    let p = { ...project }
+    p.hasRootEnvFile = p.repoPath ? fs.existsSync(path.join(p.repoPath, '.env')) : false
 
-  // Discover any new worktrees that appeared on disk since last save
-  if (state.repoPath && state.worktreesRootPath) {
-    try {
-      const discovered = await discoverExistingWorktrees(state.repoPath, state.worktreesRootPath, state.agents)
-      if (discovered.length > 0) {
-        logger.info(`Discovered ${discovered.length} new worktree(s) on startup`)
-        const updated: AppState = { ...state, agents: [...state.agents, ...discovered], hasRootEnvFile }
-        saveState(updated)
-        return { state: updated, warning }
+    if (p.repoPath && p.worktreesRootPath) {
+      try {
+        const discovered = await discoverExistingWorktrees(p.repoPath, p.worktreesRootPath, p.agents)
+        if (discovered.length > 0) {
+          logger.info(`Discovered ${discovered.length} new worktree(s) in ${p.repoPath}`)
+          p = { ...p, agents: [...p.agents, ...discovered] }
+          stateChanged = true
+        }
+      } catch (e) {
+        logger.warn('Worktree discovery on getState failed (non-fatal):', e instanceof Error ? e.message : e)
       }
-    } catch (e) {
-      logger.warn('Worktree discovery on getState failed (non-fatal):', e instanceof Error ? e.message : e)
     }
+    updatedProjects.push(p)
   }
 
-  return { state: { ...state, hasRootEnvFile }, warning }
+  state = { ...state, projects: updatedProjects }
+  if (stateChanged) {
+    saveState(state)
+  }
+
+  return { state, warning }
 }
+
+// ---- Repo pull ----
 
 async function handleRepoPull(
   event: Electron.IpcMainInvokeEvent,
@@ -197,12 +385,12 @@ async function handleRepoPull(
   if (!stateResult.ok) {
     return { ok: false, code: stateResult.code, message: stateResult.message }
   }
-  const { repoPath } = stateResult.state
-  if (!repoPath) {
+  const project = getActiveProject(stateResult.state)
+  if (!project?.repoPath) {
     return { ok: false, code: 'NO_REPO', message: 'No repository selected' }
   }
   logger.info('repo:pull', parsed.data.branch)
-  return pullMainBranch(repoPath, parsed.data.branch)
+  return pullMainBranch(project.repoPath, parsed.data.branch)
 }
 
 // ---- Zod schemas ----
@@ -307,7 +495,8 @@ async function handleAgentCreate(
     return { ok: false, code: stateResult.code, message: stateResult.message }
   }
   const state = stateResult.state
-  if (!state.repoPath || !state.worktreesRootPath) {
+  const project = getActiveProject(state)
+  if (!project?.repoPath || !project.worktreesRootPath) {
     return { ok: false, code: 'NO_REPO', message: 'No repository selected' }
   }
 
@@ -316,8 +505,8 @@ async function handleAgentCreate(
     name,
     branchName,
     baseBranch,
-    worktreesRootPath: state.worktreesRootPath,
-    repoPath: state.repoPath,
+    worktreesRootPath: project.worktreesRootPath,
+    repoPath: project.repoPath,
     copyEnvToWorktree: copyEnv ?? true,
   })
   if (!result.ok) {
@@ -325,10 +514,10 @@ async function handleAgentCreate(
     return result
   }
 
-  const newState: AppState = {
-    ...state,
-    agents: [...state.agents, result.agent],
-  }
+  const newState = updateProject(state, project.id, (p) => ({
+    ...p,
+    agents: [...p.agents, result.agent],
+  }))
   const saveResult = saveState(newState)
   if (!saveResult.ok) {
     logger.error('agent:create save failed:', saveResult.code, saveResult.message)
@@ -355,8 +544,9 @@ async function handleAgentOpen(
   if (!stateResult.ok) return { ok: false, code: stateResult.code, message: stateResult.message }
   const state = stateResult.state
 
-  const agent = state.agents.find((a) => a.id === agentId)
-  if (!agent) return { ok: false, code: 'AGENT_NOT_FOUND', message: `Agent ${agentId} not found` }
+  const found = findAgentProject(state, agentId)
+  if (!found) return { ok: false, code: 'AGENT_NOT_FOUND', message: `Agent ${agentId} not found` }
+  const { project, agent } = found
 
   logger.info(`agent:open agentId=${agentId} tool=${tool}`)
 
@@ -367,12 +557,17 @@ async function handleAgentOpen(
     if (pr.ok && pr.hasPR) prNumber = pr.prNumber
   } catch { /* non-fatal */ }
 
+  const isFirstProject = state.projects.length > 0 && state.projects[0].id === project.id
+
   return openAgent(tool, agent.worktreePath, {
     ollamaModel: state.settings.ollamaModel,
     ollamaBaseUrl: state.settings.ollamaBaseUrl,
     agentName: agent.name,
     branchName: agent.branchName,
     prNumber,
+    projectName: path.basename(project.repoPath),
+    projectColorIndex: project.colorIndex,
+    skipBgTint: isFirstProject,
   })
 }
 
@@ -391,17 +586,22 @@ async function handleRepoOpen(
 
   const stateResult = loadState()
   if (!stateResult.ok) return { ok: false, code: stateResult.code, message: stateResult.message }
-  const state = stateResult.state
+  const project = getActiveProject(stateResult.state)
 
-  if (!state.repoPath) {
+  if (!project?.repoPath) {
     return { ok: false, code: 'NO_REPO', message: 'No repository selected' }
   }
 
-  logger.info(`repo:open tool=${tool} path=${state.repoPath}`)
-  return openAgent(tool, state.repoPath, {
-    ollamaModel: state.settings.ollamaModel,
-    ollamaBaseUrl: state.settings.ollamaBaseUrl,
-    agentName: path.basename(state.repoPath),
+  const isFirstProject = stateResult.state.projects.length > 0 && stateResult.state.projects[0].id === project.id
+
+  logger.info(`repo:open tool=${tool} path=${project.repoPath}`)
+  return openAgent(tool, project.repoPath, {
+    ollamaModel: stateResult.state.settings.ollamaModel,
+    ollamaBaseUrl: stateResult.state.settings.ollamaBaseUrl,
+    agentName: path.basename(project.repoPath),
+    projectName: path.basename(project.repoPath),
+    projectColorIndex: project.colorIndex,
+    skipBgTint: isFirstProject,
   })
 }
 
@@ -443,10 +643,11 @@ async function handleAgentGitStatus(
   }
   const stateResult = loadState()
   if (!stateResult.ok) return { ok: false, code: stateResult.code, message: stateResult.message }
-  const agent = stateResult.state.agents.find((a) => a.id === parsed.data.agentId)
-  if (!agent) return { ok: false, code: 'AGENT_NOT_FOUND', message: 'Agent not found' }
 
-  const result = await getGitStatus(agent.worktreePath, agent.branchName)
+  const found = findAgentProject(stateResult.state, parsed.data.agentId)
+  if (!found) return { ok: false, code: 'AGENT_NOT_FOUND', message: 'Agent not found' }
+
+  const result = await getGitStatus(found.agent.worktreePath, found.agent.branchName)
   if (!result.ok) return result
   return { ok: true, ...result.status }
 }
@@ -464,11 +665,12 @@ async function handleAgentPull(
   }
   const stateResult = loadState()
   if (!stateResult.ok) return { ok: false, code: stateResult.code, message: stateResult.message }
-  const agent = stateResult.state.agents.find((a) => a.id === parsed.data.agentId)
-  if (!agent) return { ok: false, code: 'AGENT_NOT_FOUND', message: 'Agent not found' }
 
-  logger.info(`agent:pull agentId=${parsed.data.agentId} branch=${agent.branchName}`)
-  return pullWorktree(agent.worktreePath, agent.branchName)
+  const found = findAgentProject(stateResult.state, parsed.data.agentId)
+  if (!found) return { ok: false, code: 'AGENT_NOT_FOUND', message: 'Agent not found' }
+
+  logger.info(`agent:pull agentId=${parsed.data.agentId} branch=${found.agent.branchName}`)
+  return pullWorktree(found.agent.worktreePath, found.agent.branchName)
 }
 
 async function handleAgentRemove(
@@ -487,8 +689,10 @@ async function handleAgentRemove(
   const stateResult = loadState()
   if (!stateResult.ok) return { ok: false, code: stateResult.code, message: stateResult.message }
   const state = stateResult.state
-  const agent = state.agents.find((a) => a.id === agentId)
-  if (!agent) return { ok: false, code: 'AGENT_NOT_FOUND', message: 'Agent not found' }
+
+  const found = findAgentProject(state, agentId)
+  if (!found) return { ok: false, code: 'AGENT_NOT_FOUND', message: 'Agent not found' }
+  const { project, agent } = found
 
   // Close any open Terminal/Cursor windows for this agent before removing
   if (agent.worktreePath) {
@@ -496,19 +700,19 @@ async function handleAgentRemove(
   }
 
   let worktreeRemoveError: string | undefined
-  if (deleteWorktree && agent.worktreePath && state.repoPath) {
+  if (deleteWorktree && agent.worktreePath && project.repoPath) {
     logger.info(`agent:remove deleting worktree ${agent.worktreePath}`)
-    const removeResult = await removeWorktree(state.repoPath, agent.worktreePath)
+    const removeResult = await removeWorktree(project.repoPath, agent.worktreePath)
     if (!removeResult.ok) {
       worktreeRemoveError = removeResult.message
       logger.warn(`agent:remove worktree removal failed: ${removeResult.message}`)
     }
   }
 
-  const newState: AppState = {
-    ...state,
-    agents: state.agents.filter((a) => a.id !== agentId),
-  }
+  const newState = updateProject(state, project.id, (p) => ({
+    ...p,
+    agents: p.agents.filter((a) => a.id !== agentId),
+  }))
   const saveResult = saveState(newState)
   if (!saveResult.ok) return { ok: false, code: saveResult.code, message: saveResult.message }
 
@@ -521,7 +725,8 @@ async function handleAgentRemove(
 function getRepoPathFromState(): string | null {
   const stateResult = loadState()
   if (!stateResult.ok) return null
-  return stateResult.state.repoPath || null
+  const project = getActiveProject(stateResult.state)
+  return project?.repoPath || null
 }
 
 async function handlePromptsList(
@@ -620,10 +825,11 @@ async function handleAgentPRStatus(
   }
   const stateResult = loadState()
   if (!stateResult.ok) return { ok: false, code: stateResult.code, message: stateResult.message }
-  const agent = stateResult.state.agents.find((a) => a.id === parsed.data.agentId)
-  if (!agent) return { ok: false, code: 'AGENT_NOT_FOUND', message: 'Agent not found' }
 
-  return getPRStatus(agent.worktreePath, agent.branchName)
+  const found = findAgentProject(stateResult.state, parsed.data.agentId)
+  if (!found) return { ok: false, code: 'AGENT_NOT_FOUND', message: 'Agent not found' }
+
+  return getPRStatus(found.agent.worktreePath, found.agent.branchName)
 }
 
 async function handleAppReset(
@@ -649,12 +855,12 @@ async function handleListBranches(
   }
   const stateResult = loadState()
   if (!stateResult.ok) return { ok: false, code: stateResult.code, message: stateResult.message }
-  const { repoPath } = stateResult.state
-  if (!repoPath) {
+  const project = getActiveProject(stateResult.state)
+  if (!project?.repoPath) {
     return { ok: false, code: 'NO_REPO', message: 'No repository selected' }
   }
   try {
-    const branches = await listRepoBranches(repoPath)
+    const branches = await listRepoBranches(project.repoPath)
     return { ok: true, branches }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
@@ -670,12 +876,12 @@ async function handleListPRs(
   }
   const stateResult = loadState()
   if (!stateResult.ok) return { ok: false, code: stateResult.code, message: stateResult.message }
-  const { repoPath } = stateResult.state
-  if (!repoPath) {
+  const project = getActiveProject(stateResult.state)
+  if (!project?.repoPath) {
     return { ok: false, code: 'NO_REPO', message: 'No repository selected' }
   }
   try {
-    const prs = await listRepoPRs(repoPath)
+    const prs = await listRepoPRs(project.repoPath)
     return { ok: true, prs }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
@@ -693,102 +899,47 @@ async function handleWindowTile(
 }
 
 export function registerIpcHandlers(): void {
-  ipcMain.handle('repo:select', (event) => {
-    return handleSelectRepository(event)
-  })
+  // Project management
+  ipcMain.handle('project:add', (event) => handleProjectAdd(event))
+  ipcMain.handle('project:remove', (event, payload: unknown) => handleProjectRemove(event, payload))
+  ipcMain.handle('project:switch', (event, payload: unknown) => handleProjectSwitch(event, payload))
+  ipcMain.handle('project:reorder', (event, payload: unknown) => handleProjectReorder(event, payload))
 
-  ipcMain.handle('repo:pull', (event, payload: unknown) => {
-    return handleRepoPull(event, payload)
-  })
+  // Legacy / backward-compat
+  ipcMain.handle('repo:select', (event) => handleSelectRepository(event))
 
-  ipcMain.handle('state:get', (event) => {
-    return handleGetState(event)
-  })
-
-  ipcMain.handle('agent:validateBranch', (event, payload: unknown) => {
-    return handleAgentValidateBranch(event, payload)
-  })
-
-  ipcMain.handle('agent:create', (event, payload: unknown) => {
-    return handleAgentCreate(event, payload)
-  })
-
-  ipcMain.handle('agent:open', (event, payload: unknown) => {
-    return handleAgentOpen(event, payload)
-  })
-
-  ipcMain.handle('repo:open', (event, payload: unknown) => {
-    return handleRepoOpen(event, payload)
-  })
-
-  ipcMain.handle('settings:update', (event, payload: unknown) => {
-    return handleSettingsUpdate(event, payload)
-  })
-
-  ipcMain.handle('git:listBranches', (event) => {
-    return handleListBranches(event)
-  })
-
-  ipcMain.handle('git:listPRs', (event) => {
-    return handleListPRs(event)
-  })
-
-  ipcMain.handle('agent:gitStatus', (event, payload: unknown) => {
-    return handleAgentGitStatus(event, payload)
-  })
-
-  ipcMain.handle('agent:pull', (event, payload: unknown) => {
-    return handleAgentPull(event, payload)
-  })
-
-  ipcMain.handle('agent:remove', (event, payload: unknown) => {
-    return handleAgentRemove(event, payload)
-  })
-
-  ipcMain.handle('prompts:list', (event) => {
-    return handlePromptsList(event)
-  })
-
-  ipcMain.handle('prompts:save', (event, payload: unknown) => {
-    return handlePromptsSave(event, payload)
-  })
-
-  ipcMain.handle('prompts:delete', (event, payload: unknown) => {
-    return handlePromptsDelete(event, payload)
-  })
-
-  ipcMain.handle('prompts:changeScope', (event, payload: unknown) => {
-    return handlePromptsChangeScope(event, payload)
-  })
-
-  ipcMain.handle('tools:verify', (event, payload: unknown) => {
-    return handleToolsVerify(event, payload)
-  })
-
-  ipcMain.handle('agent:prStatus', (event, payload: unknown) => {
-    return handleAgentPRStatus(event, payload)
-  })
-
-  ipcMain.handle('app:reset', (event) => {
-    return handleAppReset(event)
-  })
+  ipcMain.handle('repo:pull', (event, payload: unknown) => handleRepoPull(event, payload))
+  ipcMain.handle('state:get', (event) => handleGetState(event))
+  ipcMain.handle('agent:validateBranch', (event, payload: unknown) => handleAgentValidateBranch(event, payload))
+  ipcMain.handle('agent:create', (event, payload: unknown) => handleAgentCreate(event, payload))
+  ipcMain.handle('agent:open', (event, payload: unknown) => handleAgentOpen(event, payload))
+  ipcMain.handle('repo:open', (event, payload: unknown) => handleRepoOpen(event, payload))
+  ipcMain.handle('settings:update', (event, payload: unknown) => handleSettingsUpdate(event, payload))
+  ipcMain.handle('git:listBranches', (event) => handleListBranches(event))
+  ipcMain.handle('git:listPRs', (event) => handleListPRs(event))
+  ipcMain.handle('agent:gitStatus', (event, payload: unknown) => handleAgentGitStatus(event, payload))
+  ipcMain.handle('agent:pull', (event, payload: unknown) => handleAgentPull(event, payload))
+  ipcMain.handle('agent:remove', (event, payload: unknown) => handleAgentRemove(event, payload))
+  ipcMain.handle('prompts:list', (event) => handlePromptsList(event))
+  ipcMain.handle('prompts:save', (event, payload: unknown) => handlePromptsSave(event, payload))
+  ipcMain.handle('prompts:delete', (event, payload: unknown) => handlePromptsDelete(event, payload))
+  ipcMain.handle('prompts:changeScope', (event, payload: unknown) => handlePromptsChangeScope(event, payload))
+  ipcMain.handle('tools:verify', (event, payload: unknown) => handleToolsVerify(event, payload))
+  ipcMain.handle('agent:prStatus', (event, payload: unknown) => handleAgentPRStatus(event, payload))
+  ipcMain.handle('app:reset', (event) => handleAppReset(event))
 
   ipcMain.handle('shell:openExternal', (event, url: unknown) => {
     if (!isSenderAllowed(event)) return
     if (typeof url !== 'string') return
-    // Allow https URLs and macOS system settings deep-links
     const isHttps = z.string().url().safeParse(url).success
     const isSystemSettings = url.startsWith('x-apple.systempreferences:')
     if (!isHttps && !isSystemSettings) return
     return shell.openExternal(url)
   })
 
-  ipcMain.handle('window:tile', (event) => {
-    return handleWindowTile(event)
-  })
+  ipcMain.handle('window:tile', (event) => handleWindowTile(event))
 
   // ---- App version + auto-update ----
-
   ipcMain.handle('app:version', (event) => {
     if (!isSenderAllowed(event)) return { version: '0.0.0' }
     return { version: getAppVersion() }
