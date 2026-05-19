@@ -193,26 +193,34 @@ export async function installUpdate(): Promise<void> {
     }
     const newAppPath = path.join(tmpDir, newAppName)
 
-    // 4. Swap bundles: move old to backup, move new into place
+    // 4. Clear quarantine attributes from extracted app (prevents Gatekeeper block)
+    logger.info('autoUpdater: clearing quarantine attributes')
+    await spawnAsync('/usr/bin/xattr', ['-cr', newAppPath])
+
+    // 5. Swap bundles: move old to backup, move new into place
     logger.info('autoUpdater: swapping app bundles')
     await spawnAsync('/bin/mv', [appBundlePath, backupPath])
     await spawnAsync('/bin/mv', [newAppPath, path.join(appBundleDir, appBundleName)])
 
-    // 5. Relaunch the new app
-    logger.info('autoUpdater: relaunching')
-    const newExePath = path.join(appBundleDir, appBundleName)
-    spawn('/usr/bin/open', ['-n', newExePath], { detached: true, stdio: 'ignore' }).unref()
+    // 6. Re-sign the swapped app ad-hoc (mv invalidates the original signature)
+    const installedAppPath = path.join(appBundleDir, appBundleName)
+    logger.info('autoUpdater: re-signing app bundle ad-hoc')
+    await spawnAsync('/usr/bin/codesign', ['--force', '--deep', '--sign', '-', installedAppPath])
 
-    // 6. Spawn detached cleanup process (removes backup + temp dir after a short delay)
+    // 7. Relaunch the new app
+    logger.info('autoUpdater: relaunching')
+    spawn('/usr/bin/open', ['-n', installedAppPath], { detached: true, stdio: 'ignore' }).unref()
+
+    // 8. Spawn detached cleanup process (removes backup + temp dir after a short delay)
     spawn('/bin/sh', ['-c', `sleep 3 && rm -rf "${backupPath}" "${tmpDir}"`], {
       detached: true,
       stdio: 'ignore',
     }).unref()
 
-    // 7. Clean up the cache zip so it doesn't get re-applied
+    // 9. Clean up the cache zip so it doesn't get re-applied
     await fs.unlink(zipPath).catch(() => {})
 
-    // 8. Quit current instance
+    // 10. Quit current instance
     app.quit()
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Install failed'
