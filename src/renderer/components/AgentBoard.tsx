@@ -15,8 +15,8 @@ export function AgentBoard() {
   const refreshAllStatuses = useAppStore((s) => s.refreshAllStatuses)
   const refreshingAll = useAppStore((s) => s.refreshingAllStatuses)
 
-  function handleRemove() {
-    refreshState()
+  async function handleRemove() {
+    await refreshState()
   }
 
   const isEmpty = agents.length === 0 && draftAgents.length === 0

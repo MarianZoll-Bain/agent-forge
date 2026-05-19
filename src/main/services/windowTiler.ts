@@ -37,14 +37,15 @@ function run() {
     catch(e) { return 0; }
   });
 
-  // Deduplicate tabbed windows: tabs share the exact same bounds,
-  // so keep only the first window per unique position.
+  // Deduplicate tabbed windows: tabs share nearly identical bounds
+  // (within a few px). Snap to a 10px grid to collapse them.
+  const snap = v => Math.round(v / 10) * 10;
   const seen = new Set();
   const wins = [];
   for (const w of allWins) {
     try {
       const b = w.bounds();
-      const key = Math.round(b.x) + ',' + Math.round(b.y) + ',' + Math.round(b.width) + ',' + Math.round(b.height);
+      const key = snap(b.x) + ',' + snap(b.y) + ',' + snap(b.width) + ',' + snap(b.height);
       if (!seen.has(key)) {
         seen.add(key);
         wins.push(w);

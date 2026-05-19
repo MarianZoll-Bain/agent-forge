@@ -110,6 +110,10 @@ if command -v tmux >/dev/null 2>&1; then
     tmux attach -t "$SESSION"
   else
     tmux new-session -d -s "$SESSION" -x "$(tput cols)" -y "$(tput lines)"
+    tmux set-option -t "$SESSION" mouse on
+    tmux set-option -t "$SESSION" set-clipboard on
+    tmux bind-key -T copy-mode MouseDragEnd1Pane send-keys -X copy-pipe-and-cancel "pbcopy"
+    tmux bind-key -T copy-mode-vi MouseDragEnd1Pane send-keys -X copy-pipe-and-cancel "pbcopy"
     tmux set-option -t "$SESSION" status-position top
     tmux set-option -t "$SESSION" status-style 'bg=${pickStatusColor(agentName)},fg=colour255,bold'
     tmux set-option -t "$SESSION" status-left " $DISPLAY_NAME "

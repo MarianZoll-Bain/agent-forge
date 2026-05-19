@@ -8,7 +8,7 @@ import { useAppStore } from '../store/useAppStore'
 
 interface AgentCardProps {
   agent: Agent
-  onRemove: (agentId: string) => void
+  onRemove: (agentId: string) => void | Promise<void>
 }
 
 /** Format an ISO date string as a human-readable relative time (e.g. "3 days ago"). */
@@ -128,7 +128,7 @@ function RemoveConfirmDialog({
   busy: boolean
   error: string | null
   onConfirm: (deleteWorktree: boolean) => void
-  onCancel: () => void
+  onCancel?: () => void
 }) {
   const [deleteWorktree, setDeleteWorktree] = useState(true)
 
@@ -136,8 +136,8 @@ function RemoveConfirmDialog({
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div
         className="absolute inset-0 bg-black/30 dark:bg-black/60 animate-fade-in"
-        onClick={busy ? undefined : onCancel}
-        onKeyDown={(e) => { if (e.key === 'Escape' && !busy) onCancel() }}
+        onClick={busy || !onCancel ? undefined : onCancel}
+        onKeyDown={(e) => { if (e.key === 'Escape' && !busy && onCancel) onCancel() }}
       />
       <div className="relative bg-white dark:bg-zinc-900 rounded-2xl shadow-elevated border border-slate-200/80 dark:border-white/[0.08] w-full max-w-sm mx-4 p-6 flex flex-col gap-4 animate-scale-in">
         <h3 className="text-base font-bold text-slate-900 dark:text-white">Remove worktree</h3>
@@ -231,14 +231,15 @@ export function AgentCard({ agent, onRemove }: AgentCardProps) {
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false)
   const [removeBusy, setRemoveBusy] = useState(false)
   const [removeError, setRemoveError] = useState<string | null>(null)
+  const removedRef = useRef(false)
   const [openBusy, setOpenBusy] = useState<string | null>(null)
   const [pullBusy, setPullBusy] = useState(false)
 
   const fetchGitStatus = useCallback(async () => {
     const api = window.agentForge
-    if (!api) return
+    if (!api || removedRef.current) return
     const result = await api.getAgentGitStatus({ agentId: agent.id })
-    if (result.ok) {
+    if (result.ok && !removedRef.current) {
       setAgentGitStatus(agent.id, result)
     }
   }, [agent.id, setAgentGitStatus])
@@ -314,26 +315,30 @@ export function AgentCard({ agent, onRemove }: AgentCardProps) {
   const handleConfirmRemove = useCallback(
     async (deleteWorktree: boolean) => {
       const api = window.agentForge
-      if (!api) return
+      if (!api || removedRef.current) return
       setRemoveError(null)
       setRemoveBusy(true)
       try {
         const result = await api.removeAgent({ agentId: agent.id, deleteWorktree })
         if (!result.ok) {
           setRemoveError(result.message)
+          setRemoveBusy(false)
           return
         }
         if (result.worktreeRemoveError) {
           setRemoveError(`Agent removed but worktree deletion failed: ${result.worktreeRemoveError}`)
+          setRemoveBusy(false)
+          return
         }
-        refreshState()
-        onRemove(agent.id)
-      } finally {
-        setRemoveBusy(false)
-        if (!removeError) setShowRemoveConfirm(false)
+        // Mark as removed so no further state updates happen on this card.
+        // Keep dialog open (busy) until parent finishes refreshing state.
+        removedRef.current = true
+        await onRemove(agent.id)
+      } catch {
+        if (!removedRef.current) setRemoveBusy(false)
       }
     },
-    [agent.id, onRemove, refreshState, removeError],
+    [agent.id, onRemove],
   )
 
   return (
@@ -506,10 +511,10 @@ export function AgentCard({ agent, onRemove }: AgentCardProps) {
       {showRemoveConfirm && (
         <RemoveConfirmDialog
           name={agent.name}
-          busy={removeBusy}
+          busy={removeBusy || removedRef.current}
           error={removeError}
           onConfirm={handleConfirmRemove}
-          onCancel={() => { setShowRemoveConfirm(false); setRemoveError(null) }}
+          onCancel={removedRef.current ? undefined : () => { setShowRemoveConfirm(false); setRemoveError(null) }}
         />
       )}
 
