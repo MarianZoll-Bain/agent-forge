@@ -34,6 +34,16 @@ Stop waiting for one agent to finish before starting the next. AgentForge lets y
 - **Offline-ready** — fly at 35,000 feet and keep shipping with local models
 - **Dark mode** — because you'll be staring at this all day
 
+### Recent additions
+
+- **Multi-project tabs** — manage multiple repos in a single window with per-project terminal colors and drag-and-drop reordering
+- **Tmux-powered terminals** — each agent session runs in a tmux session with a color-coded status bar showing project, agent, and PR info
+- **Terminal tiling** — tile all agent terminals side-by-side with one click
+- **"From PR" worktree creation** — create a worktree directly from an existing pull request
+- **Config propagation** — `.env`, `.claude/`, and `.cursor/` directories are automatically copied into new worktrees
+- **Per-agent git pull** — pull the latest changes into any agent's worktree without leaving the dashboard
+- **Auto-updates** — the app checks for updates and shows a download/restart badge in the header
+
 ---
 
 ## Installation
@@ -73,6 +83,7 @@ Once installed, AgentForge checks for updates automatically every 4 hours. When 
   - [Cursor](https://cursor.sh/) — AI-powered code editor
   - [Claude CLI](https://docs.anthropic.com/en/docs/claude-code) — Anthropic's command-line coding agent
   - [Ollama](https://ollama.com/) — local LLM runner (for offline use with Claude CLI)
+- **[tmux](https://github.com/tmux/tmux/wiki/Installing)** (recommended) — enables persistent, color-coded terminal sessions per agent. Without tmux, agent terminals still work but run without session management. A warning banner appears in the app if tmux is not detected.
 
 ## Getting Started
 

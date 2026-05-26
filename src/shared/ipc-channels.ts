@@ -432,7 +432,7 @@ export const TOOLS_VERIFY = 'tools:verify' as const
 export const APP_RESET = 'app:reset' as const
 
 export interface ToolsVerifyPayload {
-  tool: 'cursor' | 'claude' | 'claude-ollama' | 'gh'
+  tool: 'cursor' | 'claude' | 'claude-ollama' | 'gh' | 'tmux'
 }
 
 export interface ToolsVerifyResult {

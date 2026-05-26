@@ -802,7 +802,7 @@ async function handlePromptsChangeScope(
 // ---- Tool verification + App reset ----
 
 const ToolsVerifySchema = z.object({
-  tool: z.enum(['cursor', 'claude', 'claude-ollama', 'gh']),
+  tool: z.enum(['cursor', 'claude', 'claude-ollama', 'gh', 'tmux']),
 })
 
 async function handleToolsVerify(

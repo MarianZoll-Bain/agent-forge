@@ -16,13 +16,13 @@ export type VerifyToolResponse = VerifyToolResult | VerifyToolError
 
 const TIMEOUT_MS = 5_000
 
-async function runVersion(binary: string): Promise<string> {
+async function runVersion(binary: string, args: string[] = ['--version']): Promise<string> {
   const { execa } = await import('execa')
-  const { stdout } = await execa(binary, ['--version'], { timeout: TIMEOUT_MS })
+  const { stdout } = await execa(binary, args, { timeout: TIMEOUT_MS })
   return stdout.trim()
 }
 
-export async function verifyTool(tool: 'cursor' | 'claude' | 'claude-ollama' | 'gh'): Promise<VerifyToolResponse> {
+export async function verifyTool(tool: 'cursor' | 'claude' | 'claude-ollama' | 'gh' | 'tmux'): Promise<VerifyToolResponse> {
   try {
     if (tool === 'cursor') {
       const version = await runVersion('cursor')
@@ -42,6 +42,11 @@ export async function verifyTool(tool: 'cursor' | 'claude' | 'claude-ollama' | '
 
     if (tool === 'gh') {
       const version = await runVersion('gh')
+      return { ok: true, version }
+    }
+
+    if (tool === 'tmux') {
+      const version = await runVersion('tmux', ['-V'])
       return { ok: true, version }
     }
 
