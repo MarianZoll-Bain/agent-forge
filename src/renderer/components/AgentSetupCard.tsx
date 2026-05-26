@@ -22,6 +22,8 @@ function suggestBranch(name: string): string {
 export function AgentSetupCard({ draftId }: Props) {
   const { removeDraftAgent, refreshState } = useAppStore()
   const hasRootEnvFile = useAppStore((s) => s.currentProject()?.hasRootEnvFile ?? false)
+  const hasRootClaudeDir = useAppStore((s) => s.currentProject()?.hasRootClaudeDir ?? false)
+  const hasRootCursorDir = useAppStore((s) => s.currentProject()?.hasRootCursorDir ?? false)
 
   const [branchMode, setBranchMode] = useState<BranchMode>('new')
   const [nameInput, setNameInput] = useState('')
@@ -51,6 +53,8 @@ export function AgentSetupCard({ draftId }: Props) {
   const prSearchInputRef = useRef<HTMLInputElement>(null)
 
   const [copyEnv, setCopyEnv] = useState(true)
+  const [copyClaudeConfig, setCopyClaudeConfig] = useState(true)
+  const [copyCursorConfig, setCopyCursorConfig] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
 
@@ -279,6 +283,8 @@ export function AgentSetupCard({ draftId }: Props) {
         branchName,
         baseBranch: branchMode === 'new' ? (baseBranch || 'main') : 'main',
         copyEnv: hasRootEnvFile ? copyEnv : undefined,
+        copyClaudeConfig: hasRootClaudeDir ? copyClaudeConfig : undefined,
+        copyCursorConfig: hasRootCursorDir ? copyCursorConfig : undefined,
       })
 
       if (!result.ok) {
@@ -579,18 +585,49 @@ export function AgentSetupCard({ draftId }: Props) {
         </div>
       )}
 
-      {/* Copy .env option — only when repo has a .env */}
-      {hasRootEnvFile && (
-        <label className="flex items-center gap-2 cursor-pointer pt-1" htmlFor={`copy-env-${draftId}`}>
-          <input
-            id={`copy-env-${draftId}`}
-            type="checkbox"
-            checked={copyEnv}
-            onChange={(e) => setCopyEnv(e.target.checked)}
-            className="rounded border-slate-300 dark:border-white/20 text-indigo-500 focus:ring-indigo-500/30"
-          />
-          <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Copy .env to worktree</span>
-        </label>
+      {/* Copy options — only shown when repo has the relevant files/dirs */}
+      {(hasRootEnvFile || hasRootClaudeDir || hasRootCursorDir) && (
+        <div className="flex flex-col gap-1.5 pt-1">
+          <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Copy to worktree</span>
+          <div className="flex items-center gap-3 flex-wrap">
+          {hasRootEnvFile && (
+            <label className="flex items-center gap-1.5 cursor-pointer" htmlFor={`copy-env-${draftId}`}>
+              <input
+                id={`copy-env-${draftId}`}
+                type="checkbox"
+                checked={copyEnv}
+                onChange={(e) => setCopyEnv(e.target.checked)}
+                className="rounded border-slate-300 dark:border-white/20 text-indigo-500 focus:ring-indigo-500/30"
+              />
+              <span className="text-xs font-medium text-slate-500 dark:text-slate-400">.env</span>
+            </label>
+          )}
+          {hasRootClaudeDir && (
+            <label className="flex items-center gap-1.5 cursor-pointer" htmlFor={`copy-claude-${draftId}`}>
+              <input
+                id={`copy-claude-${draftId}`}
+                type="checkbox"
+                checked={copyClaudeConfig}
+                onChange={(e) => setCopyClaudeConfig(e.target.checked)}
+                className="rounded border-slate-300 dark:border-white/20 text-indigo-500 focus:ring-indigo-500/30"
+              />
+              <span className="text-xs font-medium text-slate-500 dark:text-slate-400">.claude/</span>
+            </label>
+          )}
+          {hasRootCursorDir && (
+            <label className="flex items-center gap-1.5 cursor-pointer" htmlFor={`copy-cursor-${draftId}`}>
+              <input
+                id={`copy-cursor-${draftId}`}
+                type="checkbox"
+                checked={copyCursorConfig}
+                onChange={(e) => setCopyCursorConfig(e.target.checked)}
+                className="rounded border-slate-300 dark:border-white/20 text-indigo-500 focus:ring-indigo-500/30"
+              />
+              <span className="text-xs font-medium text-slate-500 dark:text-slate-400">.cursor/</span>
+            </label>
+          )}
+          </div>
+        </div>
       )}
 
       {/* Submit error */}

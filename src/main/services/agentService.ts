@@ -9,6 +9,43 @@ import * as crypto from 'node:crypto'
 import type { Agent } from '../../shared/types'
 import type { BranchEntry, PREntry } from '../../shared/ipc-channels'
 
+// ---- Directory copy helper ----
+
+/**
+ * Check if a path is git-ignored in the given repo.
+ * Returns true if ignored, false if tracked/untracked-but-not-ignored.
+ * Falls back to true (assume ignored) on error so we copy rather than skip.
+ */
+async function isGitIgnored(repoPath: string, relativePath: string): Promise<boolean> {
+  try {
+    const { execa } = await import('execa')
+    // git check-ignore exits 0 if ignored, 1 if not ignored
+    const result = await execa('git', ['check-ignore', '-q', relativePath], { cwd: repoPath, reject: false })
+    return result.exitCode === 0
+  } catch {
+    return true // assume ignored → safe to copy
+  }
+}
+
+/**
+ * Recursively copy a directory from repo root to worktree, but only if it's
+ * git-ignored (tracked files are already present in worktrees via git).
+ */
+async function copyDirToWorktreeIfIgnored(
+  repoPath: string,
+  worktreePath: string,
+  dirName: string,
+): Promise<void> {
+  const srcDir = path.join(repoPath, dirName)
+  if (!fs.existsSync(srcDir)) return
+
+  const ignored = await isGitIgnored(repoPath, dirName)
+  if (!ignored) return // tracked by git → already in worktree
+
+  const destDir = path.join(worktreePath, dirName)
+  fs.cpSync(srcDir, destDir, { recursive: true })
+}
+
 // ---- Path helpers ----
 
 function sanitizeForPath(key: string): string {
@@ -199,6 +236,10 @@ export interface CreateAgentParams {
   repoPath: string
   /** Copy .env from repo root to the new worktree. Default: true. */
   copyEnvToWorktree?: boolean
+  /** Copy .claude/ directory from repo root to the new worktree. Default: true. */
+  copyClaudeConfig?: boolean
+  /** Copy .cursor/ directory from repo root to the new worktree. Default: true. */
+  copyCursorConfig?: boolean
 }
 
 export interface CreateAgentResult {
@@ -292,6 +333,24 @@ export async function createWorktreeForAgent(params: CreateAgentParams): Promise
       }
     } catch {
       // Non-fatal: warn but don't fail worktree creation
+    }
+  }
+
+  // Copy .claude/ directory if enabled (only when gitignored — tracked files are already in worktree)
+  if (params.copyClaudeConfig !== false) {
+    try {
+      await copyDirToWorktreeIfIgnored(repoPath, finalWorktreePath, '.claude')
+    } catch {
+      // Non-fatal
+    }
+  }
+
+  // Copy .cursor/ directory if enabled (only when gitignored — tracked files are already in worktree)
+  if (params.copyCursorConfig !== false) {
+    try {
+      await copyDirToWorktreeIfIgnored(repoPath, finalWorktreePath, '.cursor')
+    } catch {
+      // Non-fatal
     }
   }
 

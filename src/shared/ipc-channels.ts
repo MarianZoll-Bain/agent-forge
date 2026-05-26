@@ -89,6 +89,10 @@ export interface AgentCreatePayload {
   baseBranch: string
   /** Copy .env from repo root into the new worktree. Default: true. */
   copyEnv?: boolean
+  /** Copy .claude/ directory from repo root into the new worktree. Default: true. */
+  copyClaudeConfig?: boolean
+  /** Copy .cursor/ directory from repo root into the new worktree. Default: true. */
+  copyCursorConfig?: boolean
 }
 
 export interface AgentCreateResult {

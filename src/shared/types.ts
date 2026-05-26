@@ -29,6 +29,10 @@ export interface Project {
   agents: Agent[]
   /** Whether this project's repo has a .env file at its root. */
   hasRootEnvFile?: boolean
+  /** Whether this project's repo has a .claude/ directory at its root. */
+  hasRootClaudeDir?: boolean
+  /** Whether this project's repo has a .cursor/ directory at its root. */
+  hasRootCursorDir?: boolean
   /** Index into PROJECT_COLORS palette (0–9). Auto-assigned on creation. */
   colorIndex?: number
 }
