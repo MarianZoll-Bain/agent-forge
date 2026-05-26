@@ -346,6 +346,8 @@ async function handleGetState(event: Electron.IpcMainInvokeEvent): Promise<State
   for (const project of state.projects) {
     let p = { ...project }
     p.hasRootEnvFile = p.repoPath ? fs.existsSync(path.join(p.repoPath, '.env')) : false
+    p.hasRootClaudeDir = p.repoPath ? fs.existsSync(path.join(p.repoPath, '.claude')) : false
+    p.hasRootCursorDir = p.repoPath ? fs.existsSync(path.join(p.repoPath, '.cursor')) : false
 
     if (p.repoPath && p.worktreesRootPath) {
       try {
