@@ -107,6 +107,7 @@ function migrateSettings(rawSettings: Record<string, unknown>): Settings {
     ...(typeof rawSettings.enableClaudeOllama === 'boolean' ? { enableClaudeOllama: rawSettings.enableClaudeOllama } : {}),
     ...(typeof rawSettings.onboardingComplete === 'boolean' ? { onboardingComplete: rawSettings.onboardingComplete } : {}),
     ...(typeof rawSettings.enableGitMode === 'boolean' ? { enableGitMode: rawSettings.enableGitMode } : {}),
+    ...(typeof rawSettings.devServerPort === 'number' ? { devServerPort: rawSettings.devServerPort } : {}),
   }
 }
 

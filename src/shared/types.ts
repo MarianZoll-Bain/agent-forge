@@ -69,6 +69,8 @@ export interface Settings {
   onboardingComplete?: boolean
   /** Enable GitHub CLI integration (PR detection on agent cards). */
   enableGitMode?: boolean
+  /** Dev server port for electron-vite. Default: 5173. */
+  devServerPort?: number
 }
 
 export const CURRENT_STATE_VERSION = 4
