@@ -5,7 +5,7 @@
 
 import { useState, useEffect } from 'react'
 import { useAppStore } from '../store/useAppStore'
-import { ToolToggle } from './ToolToggle'
+import { ToolToggle, ToolVerifyStatus } from './ToolToggle'
 import type { Settings } from '@shared/types'
 
 const DEFAULT_OLLAMA_BASE_URL = 'http://localhost:11434'
@@ -208,7 +208,10 @@ export function SettingsPanel({ onClose, onOpenOnboarding }: SettingsPanelProps)
               <ToolToggle tool="claude" label="Claude CLI" enabled={enableClaude} onToggle={setEnableClaude} />
               <ToolToggle tool="claude-ollama" label="Claude + Ollama" enabled={enableClaudeOllama} onToggle={setEnableClaudeOllama} />
               <div className="border-t border-slate-200/60 dark:border-white/[0.06] mt-1 pt-1">
-                <ToolToggle tool="gh" label="Git Mode (GitHub CLI)" enabled={enableGitMode} onToggle={setEnableGitMode} />
+                <ToolToggle tool="gh" label="Git Mode (PR/MR status)" enabled={enableGitMode} onToggle={setEnableGitMode} />
+                {enableGitMode && (
+                  <ToolVerifyStatus tool="glab" label="GitLab CLI" />
+                )}
               </div>
             </div>
           </section>

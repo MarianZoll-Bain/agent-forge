@@ -8,10 +8,10 @@ import { CURRENT_STATE_VERSION } from '../../shared/types'
 import type { AppState, Project } from '../../shared/types'
 
 describe('stateManager', () => {
-  it('defaultState has version 4 and empty projects', () => {
+  it('defaultState has current version and empty projects', () => {
     const state = defaultState()
     expect(state.version).toBe(CURRENT_STATE_VERSION)
-    expect(state.version).toBe(4)
+    expect(state.version).toBe(5)
     expect(state.projects).toEqual([])
     expect(state.currentProjectId).toBeNull()
     expect(state.settings).toEqual({})

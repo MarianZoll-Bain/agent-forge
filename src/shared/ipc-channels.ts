@@ -153,7 +153,7 @@ export type SettingsUpdateResponse = SettingsUpdateResult | SettingsUpdateError
 /** List all branches (local + remote) for the current repo */
 export const GIT_LIST_BRANCHES = 'git:listBranches' as const
 
-/** List open PRs for the current repo via GitHub CLI */
+/** List open PRs/MRs for the current repo via GitHub CLI or GitLab CLI */
 export const GIT_LIST_PRS = 'git:listPRs' as const
 
 export interface BranchEntry {
@@ -432,7 +432,7 @@ export const TOOLS_VERIFY = 'tools:verify' as const
 export const APP_RESET = 'app:reset' as const
 
 export interface ToolsVerifyPayload {
-  tool: 'cursor' | 'claude' | 'claude-ollama' | 'gh' | 'tmux'
+  tool: 'cursor' | 'claude' | 'claude-ollama' | 'gh' | 'glab' | 'tmux'
 }
 
 export interface ToolsVerifyResult {
@@ -462,7 +462,7 @@ export type AppResetResponse = AppResetResult | AppResetError
 
 // ---- PR status channel ----
 
-/** Get PR status for an agent's branch via GitHub CLI */
+/** Get PR/MR status for an agent's branch via GitHub CLI or GitLab CLI */
 export const AGENT_PR_STATUS = 'agent:prStatus' as const
 
 export interface AgentPRStatusPayload {

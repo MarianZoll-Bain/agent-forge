@@ -21,6 +21,7 @@ import { openAgent, closeAgentWindows } from './services/agentOpener'
 import * as promptManager from './services/promptManager'
 import { verifyTool } from './services/toolVerifier'
 import { getPRStatus } from './services/prStatusService'
+import { detectHostingType } from './services/hostingDetector'
 import { getAppVersion, getUpdateStatus, checkForUpdates, downloadUpdate, installUpdate } from './services/autoUpdater'
 import { tileAgentTerminals } from './services/windowTiler'
 import type {
@@ -153,6 +154,9 @@ async function handleProjectAdd(event: Electron.IpcMainInvokeEvent): Promise<Pro
     if (!usedColors.has(i)) { colorIndex = i; break }
   }
 
+  // Detect hosting platform
+  const hostingType = await detectHostingType(repo.repoPath)
+
   const projectId = randomUUID()
   const project: Project = {
     id: projectId,
@@ -165,6 +169,7 @@ async function handleProjectAdd(event: Electron.IpcMainInvokeEvent): Promise<Pro
     hasRootClaudeDir: fs.existsSync(path.join(repo.repoPath, '.claude')),
     hasRootCursorDir: fs.existsSync(path.join(repo.repoPath, '.cursor')),
     colorIndex,
+    hostingType,
   }
 
   const newState: AppState = {
@@ -175,7 +180,7 @@ async function handleProjectAdd(event: Electron.IpcMainInvokeEvent): Promise<Pro
   const saveResult = saveState(newState)
   if (!saveResult.ok) return { ok: false, code: saveResult.code, message: saveResult.message }
 
-  logger.info(`project:add success: ${repo.repoPath}`)
+  logger.info(`project:add success: ${repo.repoPath} (hosting: ${hostingType})`)
   return { ok: true, state: newState }
 }
 
@@ -299,6 +304,8 @@ async function handleSelectRepository(event: Electron.IpcMainInvokeEvent): Promi
       if (!usedColors.has(i)) { colorIndex = i; break }
     }
 
+    const hostingType = await detectHostingType(repo.repoPath)
+
     const project: Project = {
       id: projectId,
       repoPath: repo.repoPath,
@@ -308,6 +315,7 @@ async function handleSelectRepository(event: Electron.IpcMainInvokeEvent): Promi
       agents: discoveredAgents,
       hasRootEnvFile: repo.hasRootEnvFile,
       colorIndex,
+      hostingType,
     }
     const newState: AppState = {
       ...currentState,
@@ -348,6 +356,16 @@ async function handleGetState(event: Electron.IpcMainInvokeEvent): Promise<State
     p.hasRootEnvFile = p.repoPath ? fs.existsSync(path.join(p.repoPath, '.env')) : false
     p.hasRootClaudeDir = p.repoPath ? fs.existsSync(path.join(p.repoPath, '.claude')) : false
     p.hasRootCursorDir = p.repoPath ? fs.existsSync(path.join(p.repoPath, '.cursor')) : false
+
+    // Lazy backfill hostingType for projects that don't have it yet
+    if (!p.hostingType && p.repoPath) {
+      try {
+        p.hostingType = await detectHostingType(p.repoPath)
+        stateChanged = true
+      } catch {
+        // Non-fatal
+      }
+    }
 
     if (p.repoPath && p.worktreesRootPath) {
       try {
@@ -559,10 +577,10 @@ async function handleAgentOpen(
 
   logger.info(`agent:open agentId=${agentId} tool=${tool}`)
 
-  // Best-effort PR number lookup for the tmux status bar
+  // Best-effort PR/MR number lookup for the tmux status bar
   let prNumber: number | undefined
   try {
-    const pr = await getPRStatus(agent.worktreePath, agent.branchName)
+    const pr = await getPRStatus(project.hostingType ?? 'unknown', agent.worktreePath, agent.branchName)
     if (pr.ok && pr.hasPR) prNumber = pr.prNumber
   } catch { /* non-fatal */ }
 
@@ -802,7 +820,7 @@ async function handlePromptsChangeScope(
 // ---- Tool verification + App reset ----
 
 const ToolsVerifySchema = z.object({
-  tool: z.enum(['cursor', 'claude', 'claude-ollama', 'gh', 'tmux']),
+  tool: z.enum(['cursor', 'claude', 'claude-ollama', 'gh', 'glab', 'tmux']),
 })
 
 async function handleToolsVerify(
@@ -838,7 +856,7 @@ async function handleAgentPRStatus(
   const found = findAgentProject(stateResult.state, parsed.data.agentId)
   if (!found) return { ok: false, code: 'AGENT_NOT_FOUND', message: 'Agent not found' }
 
-  return getPRStatus(found.agent.worktreePath, found.agent.branchName)
+  return getPRStatus(found.project.hostingType ?? 'unknown', found.agent.worktreePath, found.agent.branchName)
 }
 
 async function handleAppReset(
@@ -890,7 +908,7 @@ async function handleListPRs(
     return { ok: false, code: 'NO_REPO', message: 'No repository selected' }
   }
   try {
-    const prs = await listRepoPRs(project.repoPath)
+    const prs = await listRepoPRs(project.repoPath, project.hostingType ?? 'unknown')
     return { ok: true, prs }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)

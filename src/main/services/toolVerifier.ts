@@ -22,7 +22,7 @@ async function runVersion(binary: string, args: string[] = ['--version']): Promi
   return stdout.trim()
 }
 
-export async function verifyTool(tool: 'cursor' | 'claude' | 'claude-ollama' | 'gh' | 'tmux'): Promise<VerifyToolResponse> {
+export async function verifyTool(tool: 'cursor' | 'claude' | 'claude-ollama' | 'gh' | 'glab' | 'tmux'): Promise<VerifyToolResponse> {
   try {
     if (tool === 'cursor') {
       const version = await runVersion('cursor')
@@ -42,6 +42,11 @@ export async function verifyTool(tool: 'cursor' | 'claude' | 'claude-ollama' | '
 
     if (tool === 'gh') {
       const version = await runVersion('gh')
+      return { ok: true, version }
+    }
+
+    if (tool === 'glab') {
+      const version = await runVersion('glab')
       return { ok: true, version }
     }
 

@@ -2,7 +2,7 @@
  * Agent Card: worktree info, git status, open buttons, remove.
  */
 
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import type { Agent } from '@shared/types'
 import { useAppStore } from '../store/useAppStore'
 
@@ -221,7 +221,10 @@ export function AgentCard({ agent, onRemove }: AgentCardProps) {
   const gitStatus = useAppStore((s) => s.agentGitStatuses[agent.id])
   const settings = useAppStore((s) => s.state?.settings)
   const enableGitMode = useAppStore((s) => s.state?.settings.enableGitMode)
+  const hostingType = useAppStore((s) => s.currentProject()?.hostingType)
   const prStatus = useAppStore((s) => s.agentPRStatuses[agent.id])
+  const prLabel = hostingType === 'gitlab' ? 'MR' : 'PR'
+  const prPrefix = hostingType === 'gitlab' ? '!' : '#'
   const bulkRefreshing = useAppStore((s) => s.agentRefreshingIds.has(agent.id))
   const { refreshState, setAgentGitStatus, setAgentPRStatus, addToast } = useAppStore()
 
@@ -447,7 +450,7 @@ export function AgentCard({ agent, onRemove }: AgentCardProps) {
       {enableGitMode && (
         <div className="flex items-center gap-2 px-4 pb-3">
           {prLoading && !prStatus ? (
-            <span className="text-xs text-slate-400 dark:text-slate-500 italic">Checking PR...</span>
+            <span className="text-xs text-slate-400 dark:text-slate-500 italic">Checking {prLabel}...</span>
           ) : prStatus?.hasPR ? (
             <>
               <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide ${
@@ -463,7 +466,7 @@ export function AgentCard({ agent, onRemove }: AgentCardProps) {
                           ? 'bg-orange-100 text-orange-700 dark:bg-orange-500/15 dark:text-orange-400'
                           : 'bg-green-100 text-green-700 dark:bg-green-500/15 dark:text-green-400'
               }`}>
-                PR #{prStatus.prNumber}{prStatus.prState ? ` · ${
+                {prLabel} {prPrefix}{prStatus.prNumber}{prStatus.prState ? ` · ${
                   prStatus.isDraft ? 'Draft'
                     : prStatus.prState === 'MERGED' ? 'Merged'
                     : prStatus.prState === 'CLOSED' ? 'Closed'
@@ -478,21 +481,21 @@ export function AgentCard({ agent, onRemove }: AgentCardProps) {
                   onClick={() => window.agentForge?.openExternal(prStatus.prUrl!)}
                   className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline font-medium"
                 >
-                  Open PR
+                  Open {prLabel}
                 </button>
               )}
             </>
           ) : prStatus ? (
-            <span className="text-xs text-slate-400 dark:text-slate-600 italic">No PR</span>
+            <span className="text-xs text-slate-400 dark:text-slate-600 italic">No {prLabel}</span>
           ) : null}
           <div className="ml-auto flex items-center gap-1">
-            <InfoTooltip text="Commits, pushes, and PR creation should be managed inside your CLI or IDE (Cursor, Claude CLI, etc.) — AgentForge only displays the status." />
+            <InfoTooltip text={`Commits, pushes, and ${prLabel} creation should be managed inside your CLI or IDE (Cursor, Claude CLI, etc.) — AgentForge only displays the status.`} />
             <button
               type="button"
               onClick={fetchPRStatus}
               disabled={prLoading || bulkRefreshing}
-              title="Refresh PR status"
-              aria-label="Refresh PR status"
+              title={`Refresh ${prLabel} status`}
+              aria-label={`Refresh ${prLabel} status`}
               className="p-1 rounded-md text-slate-400 dark:text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 transition-colors disabled:opacity-40"
             >
               <svg className={`w-3.5 h-3.5 ${prLoading || bulkRefreshing ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">

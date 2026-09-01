@@ -24,6 +24,8 @@ export function AgentSetupCard({ draftId }: Props) {
   const hasRootEnvFile = useAppStore((s) => s.currentProject()?.hasRootEnvFile ?? false)
   const hasRootClaudeDir = useAppStore((s) => s.currentProject()?.hasRootClaudeDir ?? false)
   const hasRootCursorDir = useAppStore((s) => s.currentProject()?.hasRootCursorDir ?? false)
+  const hostingType = useAppStore((s) => s.currentProject()?.hostingType)
+  const prLabel = hostingType === 'gitlab' ? 'MR' : 'PR'
 
   const [branchMode, setBranchMode] = useState<BranchMode>('new')
   const [nameInput, setNameInput] = useState('')
@@ -351,7 +353,7 @@ export function AgentSetupCard({ draftId }: Props) {
           onClick={() => handleModeSwitch('pr')}
           className={`${tabBase} ${branchMode === 'pr' ? tabActive : tabInactive}`}
         >
-          From PR
+          From {prLabel}
         </button>
       </div>
 
@@ -493,13 +495,13 @@ export function AgentSetupCard({ draftId }: Props) {
       {branchMode === 'pr' && (
         <div>
           <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">
-            Pull Request <span className="text-red-400">*</span>
+            {hostingType === 'gitlab' ? 'Merge Request' : 'Pull Request'} <span className="text-red-400">*</span>
           </label>
           <div className="relative" ref={prDropdownRef}>
             <input
               ref={prSearchInputRef}
               type="text"
-              value={prDropdownOpen ? prSearch : (selectedPr ? `#${selectedPr.number} · ${selectedPr.title}` : '')}
+              value={prDropdownOpen ? prSearch : (selectedPr ? `${hostingType === 'gitlab' ? '!' : '#'}${selectedPr.number} · ${selectedPr.title}` : '')}
               onChange={(e) => {
                 setPrSearch(e.target.value)
                 if (!prDropdownOpen) setPrDropdownOpen(true)
@@ -509,7 +511,7 @@ export function AgentSetupCard({ draftId }: Props) {
                 setPrSearch('')
                 if (!prs.length && !prsLoading) fetchPRs()
               }}
-              placeholder={prsLoading ? 'Loading PRs...' : 'Search PRs by title, number, or branch...'}
+              placeholder={prsLoading ? `Loading ${prLabel}s...` : `Search ${prLabel}s by title, number, or branch...`}
               autoComplete="off"
               spellCheck={false}
               className={`${inputBase} border-slate-300 dark:border-white/[0.08] pr-8`}
@@ -537,7 +539,7 @@ export function AgentSetupCard({ draftId }: Props) {
                 {prsLoading ? (
                   <div className="px-3 py-2 text-xs text-slate-400">Loading...</div>
                 ) : filteredPRs.length === 0 ? (
-                  <div className="px-3 py-2 text-xs text-slate-400">No PRs found</div>
+                  <div className="px-3 py-2 text-xs text-slate-400">No {prLabel}s found</div>
                 ) : (
                   filteredPRs.map((pr) => (
                     <button
@@ -549,7 +551,7 @@ export function AgentSetupCard({ draftId }: Props) {
                       }`}
                     >
                       <div className="flex items-center gap-2">
-                        <span className="text-xs font-mono text-slate-400 shrink-0">#{pr.number}</span>
+                        <span className="text-xs font-mono text-slate-400 shrink-0">{hostingType === 'gitlab' ? '!' : '#'}{pr.number}</span>
                         <span className="text-sm text-slate-700 dark:text-slate-300 truncate">{pr.title}</span>
                         {pr.isDraft && (
                           <span className="text-[10px] font-medium text-amber-600 dark:text-amber-400 shrink-0">draft</span>
@@ -578,7 +580,7 @@ export function AgentSetupCard({ draftId }: Props) {
                 }}
                 className="text-[10px] text-indigo-500 dark:text-indigo-400 hover:underline"
               >
-                View on GitHub
+                {hostingType === 'gitlab' ? 'View on GitLab' : 'View on GitHub'}
               </button>
             </div>
           )}
