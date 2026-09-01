@@ -9,7 +9,7 @@
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { homedir } from 'node:os'
-import type { Agent, AppState, Project, Settings } from '../../shared/types'
+import type { Agent, AppState, HostingType, Project, Settings } from '../../shared/types'
 import { CURRENT_STATE_VERSION, DEFAULT_SETTINGS } from '../../shared/types'
 import { randomUUID } from 'node:crypto'
 import { isPermissionError, getPermissionGuidance } from './permissionCheck'
@@ -153,6 +153,7 @@ function migrate(state: Record<string, unknown>): AppState {
       agents: Array.isArray(p.agents) ? migrateAgents(p.agents as unknown[]) : [],
       hasRootEnvFile: typeof p.hasRootEnvFile === 'boolean' ? p.hasRootEnvFile : undefined,
       colorIndex: typeof p.colorIndex === 'number' ? p.colorIndex : undefined,
+      hostingType: (p.hostingType === 'github' || p.hostingType === 'gitlab' || p.hostingType === 'unknown') ? p.hostingType as HostingType : undefined,
     }))
     // Backfill missing colorIndex values with sequential indices
     const usedColors = new Set(projects.filter((p) => p.colorIndex != null).map((p) => p.colorIndex!))

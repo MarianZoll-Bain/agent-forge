@@ -6,7 +6,7 @@
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import * as crypto from 'node:crypto'
-import type { Agent } from '../../shared/types'
+import type { Agent, HostingType } from '../../shared/types'
 import type { BranchEntry, PREntry } from '../../shared/ipc-channels'
 
 // ---- Directory copy helper ----
@@ -196,9 +196,9 @@ export async function listRepoBranches(repoPath: string): Promise<BranchEntry[]>
   return entries
 }
 
-// ---- PR listing ----
+// ---- PR / MR listing ----
 
-export async function listRepoPRs(repoPath: string): Promise<PREntry[]> {
+async function listGitHubPRs(repoPath: string): Promise<PREntry[]> {
   const { execa } = await import('execa')
   const { stdout } = await execa(
     'gh',
@@ -224,6 +224,40 @@ export async function listRepoPRs(repoPath: string): Promise<PREntry[]> {
       isDraft: pr.isDraft,
     }))
     .sort((a, b) => b.number - a.number)
+}
+
+async function listGitLabMRs(repoPath: string): Promise<PREntry[]> {
+  const { execa } = await import('execa')
+  const { stdout } = await execa(
+    'glab',
+    ['mr', 'list', '-F', 'json', '--per-page', '50'],
+    { cwd: repoPath, timeout: 10_000 },
+  )
+  const raw: Array<{
+    iid: number
+    title: string
+    source_branch: string
+    author: { username: string }
+    web_url: string
+    draft: boolean
+  }> = JSON.parse(stdout)
+
+  return raw
+    .map((mr) => ({
+      number: mr.iid,
+      title: mr.title,
+      branchName: mr.source_branch,
+      author: mr.author?.username ?? '',
+      url: mr.web_url,
+      isDraft: mr.draft ?? false,
+    }))
+    .sort((a, b) => b.number - a.number)
+}
+
+export async function listRepoPRs(repoPath: string, hostingType: HostingType): Promise<PREntry[]> {
+  if (hostingType === 'gitlab') return listGitLabMRs(repoPath)
+  if (hostingType === 'github') return listGitHubPRs(repoPath)
+  return []
 }
 
 // ---- Public API ----

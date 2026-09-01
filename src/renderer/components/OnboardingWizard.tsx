@@ -3,7 +3,7 @@
  */
 
 import { useState } from 'react'
-import { ToolToggle } from './ToolToggle'
+import { ToolToggle, ToolVerifyStatus } from './ToolToggle'
 import { useAppStore } from '../store/useAppStore'
 import { PermissionAlert } from './PermissionAlert'
 
@@ -112,7 +112,10 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
               <ToolToggle tool="claude" label="Claude CLI" enabled={enableClaude} onToggle={setEnableClaude} />
               <ToolToggle tool="claude-ollama" label="Claude + Ollama" enabled={enableClaudeOllama} onToggle={setEnableClaudeOllama} />
               <div className="border-t border-slate-200/60 dark:border-white/[0.06] mt-1 pt-1">
-                <ToolToggle tool="gh" label="Git Mode (GitHub CLI)" enabled={enableGitMode} onToggle={setEnableGitMode} />
+                <ToolToggle tool="gh" label="Git Mode (PR/MR status)" enabled={enableGitMode} onToggle={setEnableGitMode} />
+                {enableGitMode && (
+                  <ToolVerifyStatus tool="glab" label="GitLab CLI" />
+                )}
               </div>
             </div>
             <div className="flex gap-2 justify-end pt-2">

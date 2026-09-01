@@ -5,6 +5,9 @@
 
 export type ProjectId = string
 
+/** Hosting platform detected from the git remote URL. */
+export type HostingType = 'github' | 'gitlab' | 'unknown'
+
 /** Project color palette — indices map to tmux and UI colors. */
 export const PROJECT_COLORS = [
   { name: 'Indigo',  tmux: 'colour63',  css: '#6366f1', bg: '#151520' },
@@ -35,6 +38,8 @@ export interface Project {
   hasRootCursorDir?: boolean
   /** Index into PROJECT_COLORS palette (0–9). Auto-assigned on creation. */
   colorIndex?: number
+  /** Detected hosting platform (github, gitlab, or unknown). */
+  hostingType?: HostingType
 }
 
 export interface AppState {
@@ -77,7 +82,7 @@ export interface Settings {
   devServerPort?: number
 }
 
-export const CURRENT_STATE_VERSION = 4
+export const CURRENT_STATE_VERSION = 5
 
 export const DEFAULT_SETTINGS: Settings = {}
 
