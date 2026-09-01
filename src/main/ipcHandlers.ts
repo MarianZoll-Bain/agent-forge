@@ -357,11 +357,14 @@ async function handleGetState(event: Electron.IpcMainInvokeEvent): Promise<State
     p.hasRootClaudeDir = p.repoPath ? fs.existsSync(path.join(p.repoPath, '.claude')) : false
     p.hasRootCursorDir = p.repoPath ? fs.existsSync(path.join(p.repoPath, '.cursor')) : false
 
-    // Lazy backfill hostingType for projects that don't have it yet
-    if (!p.hostingType && p.repoPath) {
+    // Lazy detect hostingType for projects missing it or stuck on 'unknown'
+    if ((!p.hostingType || p.hostingType === 'unknown') && p.repoPath) {
       try {
-        p.hostingType = await detectHostingType(p.repoPath)
-        stateChanged = true
+        const detected = await detectHostingType(p.repoPath)
+        if (detected !== p.hostingType) {
+          p.hostingType = detected
+          stateChanged = true
+        }
       } catch {
         // Non-fatal
       }
