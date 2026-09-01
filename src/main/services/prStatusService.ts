@@ -63,7 +63,7 @@ async function getGitLabMRStatus(worktreePath: string, branchName: string): Prom
     const { execa } = await import('execa')
     const { stdout } = await execa(
       'glab',
-      ['mr', 'list', '--source-branch', branchName, '-F', 'json'],
+      ['mr', 'list', '--source-branch', branchName, '--all', '-F', 'json'],
       { cwd: worktreePath, timeout: TIMEOUT_MS },
     )
     const parsed = JSON.parse(stdout) as Array<{
