@@ -32,9 +32,12 @@ describe('parseHostingType', () => {
     expect(parseHostingType('git@github.corp.net:team/repo.git')).toBe('github')
   })
 
-  it('returns unknown for other hosts', () => {
+  it('returns unknown for other hosts (probing needed)', () => {
     expect(parseHostingType('https://bitbucket.org/user/repo.git')).toBe('unknown')
     expect(parseHostingType('git@bitbucket.org:user/repo.git')).toBe('unknown')
+    // Self-hosted GitLab without "gitlab" in hostname — requires CLI probe
+    expect(parseHostingType('git@code.siemens.com:team/repo.git')).toBe('unknown')
+    expect(parseHostingType('https://code.corp.net/team/repo.git')).toBe('unknown')
   })
 
   it('returns unknown for empty or malformed URLs', () => {
