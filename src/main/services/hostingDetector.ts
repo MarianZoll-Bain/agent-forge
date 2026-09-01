@@ -45,9 +45,11 @@ async function probeHostingType(repoPath: string): Promise<HostingType> {
   const { execa } = await import('execa')
   const TIMEOUT_MS = 8_000
 
-  // Try glab first (self-hosted GitLab is the common case for 'unknown')
+  // Try glab first (self-hosted GitLab is the common case for 'unknown').
+  // Use `glab mr list --per-page 1` instead of `glab repo view` because
+  // `repo view` returns 404 on some self-hosted GitLab instances.
   try {
-    await execa('glab', ['repo', 'view'], { cwd: repoPath, timeout: TIMEOUT_MS, reject: true })
+    await execa('glab', ['mr', 'list', '--per-page', '1'], { cwd: repoPath, timeout: TIMEOUT_MS, reject: true })
     return 'gitlab'
   } catch {
     // glab didn't recognize it
